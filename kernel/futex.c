@@ -113,9 +113,9 @@ static void futex_put(struct futex *futex) {
 
 static int futex_load(struct futex *futex, dword_t *out) {
     assert(futex->mem == current->mem);
-    read_lock(&current->mem->lock, __FILE__, __LINE__);
+    read_lock(&current->mem->lock, __FILE_NAME__, __LINE__);
     dword_t *ptr = mem_ptr(current->mem, futex->addr, MEM_READ);
-    read_unlock(&current->mem->lock, __FILE__, __LINE__);
+    read_unlock(&current->mem->lock, __FILE_NAME__, __LINE__);
     if (ptr == NULL)
         return 1;
     *out = *ptr;
@@ -208,10 +208,10 @@ dword_t sys_futex(addr_t uaddr, dword_t op, dword_t val, addr_t timeout_or_val2,
           //      mytime.tv_nsec = 0;
            //     return futex_wait(uaddr, val, &mytime);
            // } else {
-            modify_critical_region_counter(current, 1, __FILE__, __LINE__);
+            modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
             dword_t return_val;
             return_val = futex_wait(uaddr, val, timeout_or_val2 ? &timeout : NULL);
-            modify_critical_region_counter(current, -1, __FILE__, __LINE__);
+            modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
             return return_val;
            // }
         case FUTEX_WAKE_:
@@ -284,7 +284,7 @@ int_t sys_set_robust_list(addr_t robust_list, dword_t len) {
 int_t sys_get_robust_list(pid_t_ pid, addr_t robust_list_ptr, addr_t len_ptr) {
     STRACE("get_robust_list(%d, %#x, %#x)", pid, robust_list_ptr, len_ptr);
 
-    complex_lockt(&pids_lock, 0, __FILE__, __LINE__);
+    complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
     struct task *task = pid_get_task(pid);
     unlock_pids(&pids_lock);
     if (task != current)

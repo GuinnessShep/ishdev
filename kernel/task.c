@@ -157,13 +157,13 @@ struct task *task_create_(struct task *parent) {
     
     task->locks_held.count = 0; // counter used to keep track of pending locks associated with task.  Do not delete when locks are present.  -mke
     task->critical_region.count = 0; // counter used to delay task deletion if positive.  --mke
+    pthread_mutex_init(&task->critical_region.lock, NULL);
+    pthread_mutex_init(&task->locks_held.lock, NULL);
+    
     return task;
 }
 
 void task_destroy(struct task *task) {
-   // if(!pthread_mutex_trylock(&task->death_lock))
-    //   return; // Task is already in the process of being deleted, most likely by do_exit().  -mke
-    
     task->exiting = true;
     
     bool signal_pending = !!(current->pending & ~current->blocked);

@@ -122,11 +122,11 @@ static int do_syslog(int type, addr_t buf_addr, int_t len) {
     }
 }
 int_t sys_syslog(int_t type, addr_t buf_addr, int_t len) {
-    ////modify_critical_region_counter(current, 1, __FILE__, __LINE__);
+    ////modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
     lock(&log_lock, 0);
     int retval = do_syslog(type, buf_addr, len);
     unlock(&log_lock);
-    ////modify_critical_region_counter(current, -1, __FILE__, __LINE__);
+    ////modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
     return retval;
 }
 
@@ -185,7 +185,7 @@ void ish_vprintk(const char *msg, va_list args) {
     buf_size += vsprintf(buf + buf_size, msg, args);
 
     // output up to the last newline, leave the rest in the buffer
-    complex_lockt(&log_lock, 1, __FILE__, __LINE__);
+    complex_lockt(&log_lock, 1, __FILE_NAME__, __LINE__);
     char *b = buf;
     char *p;
     while ((p = strchr(b, '\n')) != NULL) {
@@ -237,34 +237,34 @@ void die(const char *msg, ...) {
 
 // fun little utility function
 int current_pid(void) {
-    modify_critical_region_counter(current, 1, __FILE__, __LINE__);
+    modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
     if(current != NULL) {
         if (current->exiting != true) {
-            modify_critical_region_counter(current, -1, __FILE__, __LINE__);
+            modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
             return current->pid;
         } else {
-            modify_critical_region_counter(current, -1, __FILE__, __LINE__);
+            modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
             return -1;
         }
     }
     
-    modify_critical_region_counter(current, -1, __FILE__, __LINE__);
+    modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
     return -1;
 }
 
 int current_uid(void) {
-    modify_critical_region_counter(current, 1, __FILE__, __LINE__);
+    modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
     if(current != NULL) {
         if (current->exiting != true) {
-            modify_critical_region_counter(current, -1, __FILE__, __LINE__);
+            modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
             return current->uid;
         } else {
-            modify_critical_region_counter(current, -1, __FILE__, __LINE__);
+            modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
             return -1;
         }
     }
     
-    modify_critical_region_counter(current, -1, __FILE__, __LINE__);
+    modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
     return -1;
 }
 

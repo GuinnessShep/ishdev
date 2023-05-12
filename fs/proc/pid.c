@@ -20,7 +20,7 @@ static void proc_pid_getname(struct proc_entry *entry, char *buf) {
 }
 
 static struct task *proc_get_task(struct proc_entry *entry) {
-    complex_lockt(&pids_lock, 1, __FILE__, __LINE__);
+    complex_lockt(&pids_lock, 1, __FILE_NAME__, __LINE__);
     struct task *task = pid_get_task(entry->pid);
     if (task == NULL)
         unlock_pids(&pids_lock);
@@ -35,7 +35,7 @@ static int proc_pid_stat_show(struct proc_entry *entry, struct proc_data *buf) {
     if ((task == NULL) || (task->exiting == true))
         return _ESRCH;
         
-    ////modify_critical_region_counter(task, 1, __FILE__, __LINE__);
+    ////modify_critical_region_counter(task, 1, __FILE_NAME__, __LINE__);
     lock(&task->general_lock, 0);
     lock(&task->group->lock, 0);
     // lock(&task->sighand->lock); //mkemke.  Evil, but I'm tired of trying to track down why this is getting munged for now.
@@ -114,7 +114,7 @@ static int proc_pid_stat_show(struct proc_entry *entry, struct proc_data *buf) {
     //unlock(&task->sighand->lock);
     unlock(&task->group->lock);
     unlock(&task->general_lock);
-    ////modify_critical_region_counter(task, -1, __FILE__, __LINE__);
+    ////modify_critical_region_counter(task, -1, __FILE_NAME__, __LINE__);
     proc_put_task(task);
     return 0;
 }
@@ -164,7 +164,7 @@ static int proc_pid_cmdline_show(struct proc_entry *entry, struct proc_data *buf
     if ((task == NULL) || (task->exiting == true))
         return _ESRCH;
     
-    ////modify_critical_region_counter(task, 1, __FILE__, __LINE__);
+    ////modify_critical_region_counter(task, 1, __FILE_NAME__, __LINE__);
     
     int err = 0;
     lock(&task->general_lock, 0);
@@ -194,7 +194,7 @@ void proc_maps_dump(struct task *task, struct proc_data *buf) {
     if (mem == NULL)
         return;
 
-    read_lock(&mem->lock, __FILE__, __LINE__);
+    read_lock(&mem->lock, __FILE_NAME__, __LINE__);
     page_t page = 0;
     while (page < MEM_PAGES) {
         // find a region
@@ -241,7 +241,7 @@ void proc_maps_dump(struct task *task, struct proc_data *buf) {
                 0, // inode
                 path);
     }
-    read_unlock(&mem->lock, __FILE__, __LINE__);
+    read_unlock(&mem->lock, __FILE_NAME__, __LINE__);
 }
 
 static int proc_pid_maps_show(struct proc_entry *entry, struct proc_data *buf) {

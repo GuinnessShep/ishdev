@@ -50,13 +50,7 @@ static struct task *find_new_parent(struct task *task) {
 }
 
 noreturn void do_exit(int status) {
-    //atomic_l_lockf(0,__FILE__, __LINE__);
-   // pthread_mutex_lock(&current->death_lock);
-    if(!pthread_mutex_trylock(&current->death_lock)) {
-        goto EXIT;
-    } else {
-        //nanosleep(&lock_pause, NULL); // Stupid place holder
-    }
+    //atomic_l_lockf(0,__FILE_NAME__, __LINE__);
        
     current->exiting = true;
     
@@ -128,8 +122,8 @@ noreturn void do_exit(int status) {
     unlock(&current->group->lock);
 
     // the actual freeing needs pids_lock
-    modify_critical_region_counter(current, 1, __FILE__, __LINE__);
-    complex_lockt(&pids_lock, 0, __FILE__, __LINE__);
+    modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
+    complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
     // release the sighand
     signal_pending = !!(current->pending & ~current->blocked);
     while((critical_region_count(current) > 2) ||
@@ -192,7 +186,7 @@ noreturn void do_exit(int status) {
             exit_hook(current, status);
     }
 
-    modify_critical_region_counter(current, -1, __FILE__, __LINE__);
+    modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
     vfork_notify(current);
     if(current != leader) 
         task_destroy(current);
@@ -205,7 +199,7 @@ EXIT:pthread_exit(NULL);
 
 noreturn void do_exit_group(int status) {
     struct tgroup *group = current->group;
-    complex_lockt(&pids_lock, 0, __FILE__, __LINE__);
+    complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
     lock(&group->lock, 0);
     if (!group->doing_group_exit) {
         group->doing_group_exit = true;
@@ -226,7 +220,7 @@ noreturn void do_exit_group(int status) {
     //while((critical_region_count(current))) { // Wait for now, task is in one or more critical sections, and/or has locks
      //   nanosleep(&lock_pause, NULL);
    // }
-    modify_critical_region_counter(current, 1, __FILE__, __LINE__);
+    modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
     list_for_each_entry(&group->threads, task, group_links) {
         task->exiting = true;
         deliver_signal(task, SIGKILL_, SIGINFO_NIL);
@@ -236,7 +230,7 @@ noreturn void do_exit_group(int status) {
     }
 
     unlock_pids(&pids_lock);
-    modify_critical_region_counter(current, -1, __FILE__, __LINE__);
+    modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
     unlock(&group->lock);
     if(current->pid <= MAX_PID) // abort if crazy.  -mke
         do_exit(status);
@@ -294,7 +288,7 @@ static bool reap_if_zombie(struct task *task, struct siginfo_ *info_out, struct 
         nanosleep(&lock_pause, NULL);
         signal_pending = !!(task->pending & ~task->blocked);
     }
-    complex_lockt(&task->group->lock, 0, __FILE__, __LINE__);
+    complex_lockt(&task->group->lock, 0, __FILE_NAME__, __LINE__);
 
     dword_t exit_code = task->exit_code;
     if (task->group->doing_group_exit)
@@ -370,7 +364,7 @@ static bool reap_if_zombie(struct task *task, struct siginfo_ *info_out, struct 
         signal_pending = !!(task->pending & ~task->blocked);
     }
     // &pids_lock is locked already at this point
-    //complex_lockt(&pids_lock, 0, __FILE__, __LINE__);
+    //complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
     task_destroy(task);
     //unlock_pids(&pids_lock);
     
@@ -378,7 +372,7 @@ static bool reap_if_zombie(struct task *task, struct siginfo_ *info_out, struct 
 }
 
 static bool notify_if_stopped(struct task *task, struct siginfo_ *info_out) {
-    complex_lockt(&task->group->lock, 0, __FILE__, __LINE__);
+    complex_lockt(&task->group->lock, 0, __FILE_NAME__, __LINE__);
     bool stopped = task->group->stopped;
     unlock(&task->group->lock);
     if (!stopped || task->group->group_exit_code == 0)
@@ -424,8 +418,8 @@ int do_wait(int idtype, pid_t_ id, struct siginfo_ *info, struct rusage_ *rusage
     if (options & ~(WNOHANG_|WUNTRACED_|WEXITED_|WCONTINUED_|WNOWAIT_|__WALL_))
         return _EINVAL;
 
-    complex_lockt(&pids_lock, 0, __FILE__, __LINE__);
-    modify_critical_region_counter(current, 1, __FILE__, __LINE__);
+    complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
+    modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
     int err;
     bool got_signal = false;
 
@@ -485,12 +479,12 @@ retry:
 
     info->sig = SIGCHLD_;
 found_something:
-    modify_critical_region_counter(current, -1, __FILE__, __LINE__);
+    modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
     unlock_pids(&pids_lock);
     return 0;
 
 error:
-    modify_critical_region_counter(current, -1, __FILE__, __LINE__);
+    modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
     unlock_pids(&pids_lock);
     return err;
 }
