@@ -24,6 +24,7 @@ struct task {
     struct {
         pthread_mutex_t lock;
         int count; // If positive, don't delete yet, wait_to_delete -mke
+        int last_pid; // Here for sanity checking
     } critical_region;
     
     struct {

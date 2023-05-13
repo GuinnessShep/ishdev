@@ -244,7 +244,8 @@ typedef struct {
     // -1: write-locked
     // >0: read-locked with this many readers
     atomic_int val;
-    int favor_read;  // Increment this up each time a write lock is gained, down when a read lock is gained
+    pthread_rwlock_t read_pending_lock;
+    int reads_pending; // How many reads are outstanding?
     const char *file;
     int line;
     int pid;
@@ -255,6 +256,23 @@ typedef struct {
 static inline void _read_unlock(wrlock_t *lock, const char*, int);
 static inline void _write_unlock(wrlock_t *lock, const char*, int);
 static inline void write_unlock_and_destroy(wrlock_t *lock);
+
+int lock_reads_pending_count(wrlock_t *lock, int increment) {
+    pthread_rwlock_rdlock(&lock->read_pending_lock);
+    if(increment)
+        lock->reads_pending++;
+    int rpend = lock->reads_pending;
+    return rpend;
+}
+
+int unlock_reads_pending_count(wrlock_t *lock) {
+    lock->reads_pending--;
+    if(lock->reads_pending < 0)
+        lock->reads_pending = 0;
+    int rpend = lock->reads_pending;
+    pthread_rwlock_unlock(&lock->read_pending_lock);
+    return rpend;
+}
 
 static inline void loop_lock_read(wrlock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line) {
     modify_critical_region_counter_wrapper(1, __FILE_NAME__, __LINE__);
@@ -295,9 +313,6 @@ static inline void loop_lock_read(wrlock_t *lock, __attribute__((unused)) const 
         nanosleep(&lock_pause, NULL);
         atomic_l_lockf("ll_read\0", __FILE_NAME__, __LINE__);
     }
-    
-//    if(lock->favor_read > 24)
-//        lock->favor_read = lock->favor_read - 25;
     
     modify_critical_region_counter_wrapper(-1, __FILE_NAME__, __LINE__);
 }
@@ -530,13 +545,14 @@ static inline void wrlock_init(wrlock_t *lock) {
 #else
     if (pthread_rwlock_init(&lock->l, pattr)) __builtin_trap();
 #endif
-    lock->val = lock->line = lock->pid = 0;
+    lock->val = lock->line = lock->pid = lock->reads_pending = 0;
     //strcpy(lock->comm,NULL);
+    pthread_rwlock_init(&lock->read_pending_lock, NULL);
     lock->file = NULL;
 }
 
 static inline void _lock_destroy(wrlock_t *lock) {
-    while((critical_region_count_wrapper() > 1) && (current_pid() != 1)) { // Wait for now, task is in one or more critical sections
+    while((critical_region_count_wrapper() > 1) && (current_pid() != 1) && lock_reads_pending_count(lock, 0)) { // Wait for now, task is in one or more critical sections
         nanosleep(&lock_pause, NULL);
     }
 #ifdef JUSTLOG
@@ -559,7 +575,9 @@ static inline void lock_destroy(wrlock_t *lock) {
 }
 
 static inline void _read_lock(wrlock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line) {
+    lock_reads_pending_count(lock, 1);
     loop_lock_read(lock, file, line);
+    unlock_reads_pending_count(lock);
     modify_critical_region_counter_wrapper(1, __FILE_NAME__, __LINE__);
     //pthread_rwlock_rdlock(&lock->l);
     // assert(lock->val >= 0);  //  If it isn't >= zero we have a problem since that means there is a write lock somehow.  -mke
@@ -616,6 +634,7 @@ static inline void write_to_read_lock(wrlock_t *lock, __attribute__((unused)) co
 
 static inline void write_unlock_and_destroy(wrlock_t *lock) {
     modify_critical_region_counter_wrapper(1, __FILE_NAME__, __LINE__);
+
     atomic_l_lockf("wuad_lock\0", __FILE_NAME__, __LINE__);
     _write_unlock(lock, __FILE_NAME__, __LINE__);
     _lock_destroy(lock);

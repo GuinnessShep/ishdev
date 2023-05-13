@@ -54,8 +54,7 @@ dword_t sys_clock_nanosleep_time64(int fuck, int it, const struct timespec *all,
 }
 
 dword_t sys_clock_gettime64(dword_t clock, struct timespec *tp) {
-    //return clock_gettime(clock, tp);
-    return sys_clock_gettime(clock, &tp);
+    return sys_clock_gettime(clock, (uintptr_t)tp);
 }
 
 dword_t sys_time(addr_t time_out) {
