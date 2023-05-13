@@ -9,20 +9,20 @@ jobs:
     if: github.repository == 'ish-app/ish'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Setup dependencies
         run: |
-          sudo apt-get install rclone
+          curl https://rclone.org/install.sh | sudo bash
           mkdir -p ~/.config/rclone
           echo "$RCLONE_CONFIG" > ~/.config/rclone/rclone.conf
         env:
           RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
       - name: Update
         run: |
-          deps/aports/sync-archive.sh v3.12 main/x86
-          deps/aports/sync-archive.sh v3.12 community/x86
           deps/aports/sync-archive.sh v3.14 main/x86 deps/aports/main/x86/index.txt
-          deps/aports/sync-archive.sh v3.14 community/x86  deps/aports/community/x86/index.txt
+          deps/aports/sync-archive.sh v3.14 community/x86 deps/aports/community/x86/index.txt
+          deps/aports/sync-archive.sh v3.17 main/x86
+          deps/aports/sync-archive.sh v3.17 community/x86
       - name: Commit
         id: commit
         run: |

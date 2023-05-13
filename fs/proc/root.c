@@ -173,8 +173,8 @@ static int proc_show_meminfo(struct proc_entry *UNUSED(entry), struct proc_data 
 
 static int proc_show_uptime(struct proc_entry *UNUSED(entry), struct proc_data *buf) {
     struct uptime_info uptime_info = get_uptime();
-    unsigned uptime = uptime_info.uptime_ticks;
-    proc_printf(buf, "%u.%u %u.%u\n", uptime / 100, uptime % 100, uptime / 100, uptime % 100);
+    unsigned long uptime = uptime_info.uptime_ticks;
+    proc_printf(buf, "%lu.%lu %lu.%lu\n", uptime / 100, uptime % 100, uptime / 100, uptime % 100);
     return 0;
 }
 static int proc_show_vmstat(struct proc_entry *UNUSED(entry), struct proc_data *UNUSED(buf)) {
