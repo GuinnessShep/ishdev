@@ -140,6 +140,7 @@ noreturn void do_exit(int status) {
         list_remove(&sigqueue->queue);
         free(sigqueue);
     }
+    //unlock_pids(&pids_lock);
     struct task *leader = current->group->leader;
 
     // reparent children
@@ -194,7 +195,7 @@ noreturn void do_exit(int status) {
     unlock_pids(&pids_lock);
     //atomic_l_unlockf();
 
-EXIT:pthread_exit(NULL);
+    pthread_exit(NULL);
 }
 
 noreturn void do_exit_group(int status) {

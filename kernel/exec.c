@@ -109,13 +109,9 @@ static int load_entry(struct prg_header ph, addr_t bias, struct fd *fd) {
         if (tail_size != 0) {
             // Unlock and lock the mem because the user functions must be
             // called without locking mem.
-            //modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
-	    if(trylockw(&current->mem->lock)) //  Test to see if it is actually locked.  This is likely masking an underlying problem.  -mke
-            printk("WARNING: in load_entry() requested memory was not locked\n");
-            
-            user_memset(file_end, 0, tail_size);
             write_unlock(&current->mem->lock, __FILE_NAME__, __LINE__);
-            //modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
+            user_memset(file_end, 0, tail_size);
+            write_lock(&current->mem->lock, __FILE_NAME__, __LINE__);
         }
         if (tail_size > bss_size)
             tail_size = bss_size;
@@ -128,6 +124,7 @@ static int load_entry(struct prg_header ph, addr_t bias, struct fd *fd) {
     }
     return 0;
 }
+
 
 static addr_t find_hole_for_elf(struct elf_header *header, struct prg_header *ph) {
     struct prg_header *first = NULL, *last = NULL;

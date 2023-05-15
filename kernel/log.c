@@ -239,11 +239,10 @@ void die(const char *msg, ...) {
 int current_pid(void) {
     modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
     if(current != NULL) {
-        if (current->exiting != true) {
-            modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
+        modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
+        if ((current->exiting == false) || (current != NULL)) {
             return current->pid;
         } else {
-            modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
             return -1;
         }
     }
@@ -255,7 +254,7 @@ int current_pid(void) {
 int current_uid(void) {
     modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
     if(current != NULL) {
-        if (current->exiting != true) {
+        if ((current->exiting == false) || (current != NULL)) {
             modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
             return current->uid;
         } else {
