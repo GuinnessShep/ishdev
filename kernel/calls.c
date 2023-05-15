@@ -348,7 +348,7 @@ void handle_interrupt(int interrupt) {
                 // Fail silently
                 //printk("WARNING:(PID: %d(%s)) silent stub syscall %d\n", current->pid, current->comm, syscall_num);
             }
-            lock(&current->ptrace.lock, 0);
+            simple_lockt(&current->ptrace.lock, 0);
             if (current->ptrace.stop_at_syscall) {
                 
                 ////modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
@@ -357,7 +357,7 @@ void handle_interrupt(int interrupt) {
                 
                 unlock(&current->ptrace.lock);
                 receive_signals();
-                lock(&current->ptrace.lock, 0);
+                simple_lockt(&current->ptrace.lock, 0);
                 current->ptrace.stop_at_syscall = false;
             }
             unlock(&current->ptrace.lock);
@@ -365,13 +365,13 @@ void handle_interrupt(int interrupt) {
             int result = syscall_table[syscall_num](cpu->ebx, cpu->ecx, cpu->edx, cpu->esi, cpu->edi, cpu->ebp);
             STRACE(" = 0x%x\n", result);
             cpu->eax = result;
-            lock(&current->ptrace.lock, 0);
+            simple_lockt(&current->ptrace.lock, 0);
             if (current->ptrace.stop_at_syscall) {
                 current->ptrace.syscall = syscall_num;
                 send_signal(current, SIGTRAP_, SIGINFO_NIL);
                 unlock(&current->ptrace.lock);
                 receive_signals();
-                lock(&current->ptrace.lock, 0);
+                simple_lockt(&current->ptrace.lock, 0);
                 current->ptrace.stop_at_syscall = false;
             }
             unlock(&current->ptrace.lock);
@@ -429,7 +429,7 @@ void handle_interrupt(int interrupt) {
     receive_signals();
     struct tgroup *group = current->group;
     ////modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
-    lock(&group->lock, 0);
+    simple_lockt(&group->lock, 0);
     while (group->stopped)
         wait_for_ignore_signals(&group->stopped_cond, &group->lock, NULL);
     unlock(&group->lock);

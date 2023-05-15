@@ -44,7 +44,7 @@ void mem_init(struct mem *mem) {
 }
 
 void mem_destroy(struct mem *mem) {
-    write_lock(&mem->lock);
+    write_lock(&mem->lock, __FILE_NAME__, __LINE__);
     while((critical_region_count(current) > 1) && (current->pid > 1) ){ // Wait for now, task is in one or more critical sections, and/or has locks
         nanosleep(&lock_pause, NULL);
     }
@@ -360,7 +360,7 @@ void *mem_ptr(struct mem *mem, addr_t addr, int type) {
         // if page is cow, ~~milk~~ copy it
         
         if (entry->flags & P_COW) {
-            lock(&current->general_lock, 0);  // prevent elf_exec from doing mm_release while we are in flight?  -mke
+            simple_lockt(&current->general_lock, 0);  // prevent elf_exec from doing mm_release while we are in flight?  -mke
             //modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
             read_to_write_lock(&mem->lock);
             void *copy = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);

@@ -116,7 +116,7 @@ noreturn void do_exit(int status) {
     // save things that our parent might be interested in
     current->exit_code = status; // FIXME locking
     struct rusage_ rusage = rusage_get_current();
-    lock(&current->group->lock, 0);
+    simple_lockt(&current->group->lock, 0);
     rusage_add(&current->group->rusage, &rusage);
     struct rusage_ group_rusage = current->group->rusage;
     unlock(&current->group->lock);
@@ -200,7 +200,7 @@ EXIT:pthread_exit(NULL);
 noreturn void do_exit_group(int status) {
     struct tgroup *group = current->group;
     complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
-    lock(&group->lock, 0);
+    simple_lockt(&group->lock, 0);
     if (!group->doing_group_exit) {
         group->doing_group_exit = true;
         group->group_exit_code = status;
@@ -247,7 +247,7 @@ static void halt_system(void) {
     }
 
     // unmount all filesystems
-    lock(&mounts_lock, 0);
+    simple_lockt(&mounts_lock, 0);
     struct mount *mount, *tmp;
     list_for_each_entry_safe(&mounts, mount, tmp, mounts) {
         mount_remove(mount);
@@ -297,7 +297,7 @@ static bool reap_if_zombie(struct task *task, struct siginfo_ *info_out, struct 
 
     struct rusage_ rusage = task->group->rusage;
     if (!(options & WNOWAIT_)) {
-        lock(&current->group->lock, 0);
+        simple_lockt(&current->group->lock, 0);
         rusage_add(&current->group->children_rusage, &rusage);
         unlock(&current->group->lock);
     }
@@ -394,7 +394,7 @@ static bool reap_if_needed(struct task *task, struct siginfo_ *info_out, struct 
        //     pthread_mutex_unlock(&extra_lock);
         return true;
     }
-    lock(&task->ptrace.lock, 0);
+    simple_lockt(&task->ptrace.lock, 0);
     if (task->ptrace.stopped && task->ptrace.signal) {
         // I had this code here because it made something work, but it's now
         // making GDB think we support events (we don't). I can't remember what

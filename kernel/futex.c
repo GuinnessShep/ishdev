@@ -89,7 +89,7 @@ static struct futex *futex_get_unlocked(addr_t addr) {
 // Returns the futex for the current process at the given addr, and locks it
 // Unlocked variant is available for times when you need to get two futexes at once
 static struct futex *futex_get(addr_t addr) {
-    lock(&futex_lock, 0);
+    simple_lockt(&futex_lock, 0);
     struct futex *futex = futex_get_unlocked(addr);
     if (futex == NULL)
         unlock(&futex_lock);

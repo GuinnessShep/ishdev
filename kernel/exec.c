@@ -111,9 +111,10 @@ static int load_entry(struct prg_header ph, addr_t bias, struct fd *fd) {
             // called without locking mem.
             //modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
 	    if(trylockw(&current->mem->lock)) //  Test to see if it is actually locked.  This is likely masking an underlying problem.  -mke
-                write_unlock(&current->mem->lock, __FILE_NAME__, __LINE__);
+            printk("WARNING: in load_entry() requested memory was not locked\n");
+            
             user_memset(file_end, 0, tail_size);
-            write_lock(&current->mem->lock);
+            write_unlock(&current->mem->lock, __FILE_NAME__, __LINE__);
             //modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
         }
         if (tail_size > bss_size)
@@ -207,11 +208,11 @@ static int elf_exec(struct fd *fd, const char *file, struct exec_args argv, stru
     // general_lock protects current->mm. otherwise procfs might read the
     // pointer before it's released and then try to lock it after it's
     // released.
-    lock(&current->general_lock, 0);
+    simple_lockt(&current->general_lock, 0);
     mm_release(current->mm);
     task_set_mm(current, mm_new());
     unlock(&current->general_lock);
-    write_lock(&current->mem->lock);
+    write_lock(&current->mem->lock, __FILE_NAME__, __LINE__);
 
     current->mm->exefile = fd_retain(fd);
 
@@ -599,7 +600,7 @@ int __do_execve(const char *file, struct exec_args argv, struct exec_args envp) 
     }
 
     // save current->comm
-    lock(&current->general_lock, 0);
+    simple_lockt(&current->general_lock, 0);
     const char *basename = strrchr(file, '/');
     if (basename == NULL)
         basename = file;
@@ -615,7 +616,7 @@ int __do_execve(const char *file, struct exec_args argv, struct exec_args envp) 
     fdtable_do_cloexec(current->files);
 
     // reset signal handlers
-    lock(&current->sighand->lock, 0);
+    simple_lockt(&current->sighand->lock, 0);
     for (int sig = 0; sig < NUM_SIGS; sig++) {
         struct sigaction_ *action = &current->sighand->action[sig];
         if (action->handler != SIG_IGN_)

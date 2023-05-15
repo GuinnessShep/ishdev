@@ -36,8 +36,8 @@ static int proc_pid_stat_show(struct proc_entry *entry, struct proc_data *buf) {
         return _ESRCH;
         
     ////modify_critical_region_counter(task, 1, __FILE_NAME__, __LINE__);
-    lock(&task->general_lock, 0);
-    lock(&task->group->lock, 0);
+    simple_lockt(&task->general_lock, 0);
+    simple_lockt(&task->group->lock, 0);
     // lock(&task->sighand->lock); //mkemke.  Evil, but I'm tired of trying to track down why this is getting munged for now.
 
     // program reads this using read-like syscall, so we are in blocking area,
@@ -144,7 +144,7 @@ static int proc_pid_auxv_show(struct proc_entry *entry, struct proc_data *buf) {
         return _ESRCH;
     task->process_info_being_read = true;
     int err = 0;
-    lock(&task->general_lock, 0);
+    simple_lockt(&task->general_lock, 0);
     if (task->mm == NULL)
         goto out_free_task;
 
@@ -175,7 +175,7 @@ static int proc_pid_cmdline_show(struct proc_entry *entry, struct proc_data *buf
     ////modify_critical_region_counter(task, 1, __FILE_NAME__, __LINE__);
     
     int err = 0;
-    lock(&task->general_lock, 0);
+    simple_lockt(&task->general_lock, 0);
     
     if (task->mm == NULL)
         goto out_free_task;
@@ -286,7 +286,7 @@ static bool proc_pid_fd_readdir(struct proc_entry *entry, unsigned long *index, 
     struct task *task = proc_get_task(entry);
     if ((task == NULL) || (task->exiting == true)) 
         return _ESRCH;
-    lock(&task->files->lock, 0);
+    simple_lockt(&task->files->lock, 0);
     while (*index < task->files->size && task->files->files[*index] == NULL)
         (*index)++;
     fd_t f = (*index)++;
@@ -307,7 +307,7 @@ static int proc_pid_fd_readlink(struct proc_entry *entry, char *buf) {
         proc_put_task(task);
         return _ESRCH;
     }
-    lock(&task->files->lock, 0);
+    simple_lockt(&task->files->lock, 0);
     struct fd *fd = fdtable_get(task->files, entry->fd);
     int err = generic_getpath(fd, buf);
     unlock(&task->files->lock);
@@ -319,7 +319,7 @@ static int proc_pid_exe_readlink(struct proc_entry *entry, char *buf) {
     struct task *task = proc_get_task(entry);
     if ((task == NULL) || task->exiting == true)
         return _ESRCH;
-    lock(&task->general_lock, 0);
+    simple_lockt(&task->general_lock, 0);
     int err = generic_getpath(task->mm->exefile, buf);
     unlock(&task->general_lock);
     proc_put_task(task);

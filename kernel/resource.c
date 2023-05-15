@@ -22,7 +22,7 @@ static int rlimit_get(struct task *task, int resource, struct rlimit_ *limit) {
     if (!resource_valid(resource))
         return _EINVAL;
     struct tgroup *group = task->group;
-    lock(&group->lock, 0);
+    simple_lockt(&group->lock, 0);
     *limit = group->limits[resource];
     unlock(&group->lock);
     return 0;
@@ -32,7 +32,7 @@ static int rlimit_set(struct task *task, int resource, struct rlimit_ limit) {
     if (!resource_valid(resource))
         return _EINVAL;
     struct tgroup *group = task->group;
-    lock(&group->lock, 0);
+    simple_lockt(&group->lock, 0);
     group->limits[resource] = limit;
     unlock(&group->lock);
     return 0;
@@ -137,7 +137,7 @@ dword_t sys_prlimit64(pid_t_ pid, dword_t resource, addr_t new_limit_addr, addr_
     return 0;
 }
 
-struct rusage_ rusage_get_current() {
+struct rusage_ rusage_get_current(void) {
     // only the time fields are currently implemented
     struct rusage_ rusage;
     ////modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
@@ -183,7 +183,7 @@ dword_t sys_getrusage(dword_t who, addr_t rusage_addr) {
             rusage = rusage_get_current();
             break;
         case RUSAGE_CHILDREN_:
-            lock(&current->group->lock, 0);
+            simple_lockt(&current->group->lock, 0);
             rusage = current->group->children_rusage;
             unlock(&current->group->lock);
             break;
@@ -205,7 +205,7 @@ int_t sys_sched_getaffinity(pid_t_ pid, dword_t cpusetsize, addr_t cpuset_addr) 
             return _ESRCH;
     }
 
-    unsigned cpus = sysconf(_SC_NPROCESSORS_ONLN);
+    long cpus = sysconf(_SC_NPROCESSORS_ONLN);
     char cpuset[cpus / 8 + 1];
     if (cpusetsize < sizeof(cpuset))
         return _EINVAL;

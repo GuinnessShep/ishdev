@@ -248,7 +248,7 @@ void task_run_current() {
         read_lock(&current->mem->lock, __FILE__, __LINE__);
         
         if(!doEnableMulticore) {
-            threaded_lock(&multicore_lock, 1);
+            safe_mutex_lock(&multicore_lock);
         }
         
         int interrupt = cpu_run_to_interrupt(cpu, &tlb);

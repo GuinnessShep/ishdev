@@ -2,6 +2,7 @@
 #include "kernel/calls.h"
 #include "kernel/fs.h"
 #include "fs/inode.h"
+#include "util/sync.h"
 #include <string.h>
 
 static bool file_locks_overlap(struct file_lock *a, struct file_lock *b) {
@@ -146,7 +147,7 @@ static int file_lock_from_flock(struct fd *fd, struct flock_ *flock, struct file
             offset = 0;
             break;
         case LSEEK_CUR:
-            lock(&fd->lock, 0);
+            simple_lockt(&fd->lock, 0);
             offset = fd->ops->lseek(fd, 0, LSEEK_CUR);
             unlock(&fd->lock);
             if (offset < 0)
@@ -197,7 +198,7 @@ int fcntl_getlk(struct fd *fd, struct flock_ *flock) {
     if (flock->type != F_RDLCK_ && flock->type != F_WRLCK_)
         return _EINVAL;
     struct inode_data *inode = fd->inode;
-    lock(&inode->lock, 0);
+    simple_lockt(&inode->lock, 0);
 
     struct file_lock request;
     int err = file_lock_from_flock(fd, flock, &request);
@@ -224,7 +225,7 @@ int fcntl_setlk(struct fd *fd, struct flock_ *flock, bool blocking) {
         return _EBADF;
 
     struct inode_data *inode = fd->inode;
-    lock(&inode->lock, 0);
+    simple_lockt(&inode->lock, 0);
 
     struct file_lock request;
     int err = file_lock_from_flock(fd, flock, &request);
@@ -246,7 +247,7 @@ out:
 
 void file_lock_remove_owned_by(struct fd *fd, void *owner) {
     struct inode_data *inode = fd->inode;
-    lock(&inode->lock, 0);
+    simple_lockt(&inode->lock, 0);
     struct file_lock *lock, *tmp;
     list_for_each_entry_safe(&inode->posix_locks, lock, tmp, locks) {
         if (lock->owner == owner)

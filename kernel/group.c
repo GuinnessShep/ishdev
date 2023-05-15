@@ -82,9 +82,9 @@ void task_leave_session(struct task *task) {
     struct tgroup *group = task->group;
     list_remove_safe(&group->session);
     if (group->tty) {
-        lock(&ttys_lock, 0);
+        simple_lockt(&ttys_lock, 0);
         if (list_empty(&pid_get(group->sid)->session)) {
-            lock(&group->tty->lock, 0);
+            simple_lockt(&group->tty->lock, 0);
             group->tty->session = 0;
             unlock(&group->tty->lock);
         }

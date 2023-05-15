@@ -82,8 +82,8 @@ bool poll_has_fd(struct poll *poll, struct fd *fd) {
 
 int poll_add_fd(struct poll *poll, struct fd *fd, int types, union poll_fd_info info) {
     int err;
-    lock(&fd->poll_lock, 0);
-    lock(&poll->lock, 0);
+    simple_lockt(&fd->poll_lock, 0);
+    simple_lockt(&poll->lock, 0);
 
     struct poll_fd *poll_fd;
     if (!list_empty(&poll->pollfd_freelist)) {
@@ -123,8 +123,8 @@ out:
 
 int poll_del_fd(struct poll *poll, struct fd *fd) {
     int err;
-    lock(&fd->poll_lock, 0);
-    lock(&poll->lock, 0);
+    simple_lockt(&fd->poll_lock, 0);
+    simple_lockt(&poll->lock, 0);
     struct poll_fd *poll_fd = poll_find_fd(poll, fd);
     if (poll_fd == NULL) {
         err = _ENOENT;
@@ -152,8 +152,8 @@ out:
 
 int poll_mod_fd(struct poll *poll, struct fd *fd, int types, union poll_fd_info info) {
     int err;
-    lock(&fd->poll_lock, 0);
-    lock(&poll->lock, 0);
+    simple_lockt(&fd->poll_lock, 0);
+    simple_lockt(&poll->lock, 0);
     struct poll_fd *poll_fd = poll_find_fd(poll, fd);
     if (poll_fd == NULL) {
         err = _ENOENT;
@@ -180,10 +180,10 @@ out:
 }
 
 void poll_cleanup_fd(struct fd *fd) {
-    lock(&fd->poll_lock, 0);
+    simple_lockt(&fd->poll_lock, 0);
     struct poll_fd *poll_fd, *tmp;
     list_for_each_entry_safe(&fd->poll_fds, poll_fd, tmp, polls) {
-        lock(&poll_fd->poll->lock, 0);
+        simple_lockt(&poll_fd->poll->lock, 0);
         if (poll_fd_is_real(poll_fd))
             real_poll_update(&poll_fd->poll->real, fd->real_fd, 0, poll_fd);
         list_remove(&poll_fd->polls);
@@ -196,10 +196,10 @@ void poll_cleanup_fd(struct fd *fd) {
 
 void poll_wakeup(struct fd *fd, int events) {
     struct poll_fd *poll_fd;
-    lock(&fd->poll_lock, 0);
+    simple_lockt(&fd->poll_lock, 0);
     list_for_each_entry(&fd->poll_fds, poll_fd, polls) {
         struct poll *poll = poll_fd->poll;
-        lock(&poll->lock,0);
+        simple_lockt(&poll->lock,0);
         if (poll_fd->types & POLL_EDGETRIGGERED)
             poll_fd->triggered_types &= ~events;
         if (poll->notify_pipe[1] != -1)
@@ -211,7 +211,7 @@ void poll_wakeup(struct fd *fd, int events) {
 }
 
 int poll_wait(struct poll *poll_, poll_callback_t callback, void *context, struct timespec *timeout) {
-    lock(&poll_->lock, 0);
+    simple_lockt(&poll_->lock, 0);
 
     // acquire the pipe
     if (poll_->waiters++ == 0) {
@@ -265,7 +265,7 @@ int poll_wait(struct poll *poll_, poll_callback_t callback, void *context, struc
         if (res > 0)
             break;
 
-        lock(&current->sighand->lock,0);
+        simple_lockt(&current->sighand->lock,0);
         bool signal_pending = !!(current->pending & ~current->blocked);
         unlock(&current->sighand->lock);
         if (signal_pending) {
@@ -284,7 +284,7 @@ int poll_wait(struct poll *poll_, poll_callback_t callback, void *context, struc
 
             err = real_poll_wait(&poll_->real, e, sizeof(e)/sizeof(e[0]), timeout);
       
-            lock(&poll_->lock, 0);
+            simple_lockt(&poll_->lock, 0);
         } while (sockrestart_should_restart_listen_wait(1) && errno == EINTR);
         list_for_each_entry(&poll_->poll_fds, poll_fd, fds) {
             sockrestart_end_listen_wait(poll_fd->fd);
@@ -335,7 +335,7 @@ void poll_destroy(struct poll *poll) {
         nanosleep(&lock_pause, NULL);
     }
     list_for_each_entry_safe(&poll->poll_fds, poll_fd, tmp, fds) {
-        lock(&poll_fd->fd->poll_lock, 0);
+        simple_lockt(&poll_fd->fd->poll_lock, 0);
         list_remove(&poll_fd->polls);
         list_remove(&poll_fd->fds);
         unlock(&poll_fd->fd->poll_lock);

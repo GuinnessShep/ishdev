@@ -37,7 +37,7 @@ static int pty_master_init(struct tty *tty) {
 static void pty_master_cleanup(struct tty *tty) {
     struct tty *slave = tty->pty.other;
     slave->pty.other = NULL;
-    lock(&slave->lock, 0);
+    simple_lockt(&slave->lock, 0);
     tty_hangup(slave);
     unlock(&slave->lock);
     tty_release(slave);
@@ -100,7 +100,7 @@ DEFINE_TTY_DRIVER(pty_slave, &pty_slave_ops, TTY_PSEUDO_SLAVE_MAJOR, MAX_PTYS);
 
 static int pty_reserve_next() {
     int pty_num;
-    lock(&ttys_lock, 0);
+    simple_lockt(&ttys_lock, 0);
     for (pty_num = 0; pty_num < MAX_PTYS; pty_num++) {
         if (pty_slave.ttys[pty_num] == NULL)
             break;
@@ -147,7 +147,7 @@ static const struct fd_ops devpts_fdops;
 static bool devpts_pty_exists(int pty_num) {
     if (pty_num < 0 || pty_num > MAX_PTYS)
         return false;
-    lock(&ttys_lock, 0);
+    simple_lockt(&ttys_lock, 0);
     bool exists = pty_slave.ttys[pty_num] != NULL;
     unlock(&ttys_lock);
     return exists;
@@ -199,10 +199,10 @@ static void devpts_stat_num(int pty_num, struct statbuf *stat) {
         stat->mode = S_IFDIR | 0755;
         stat->inode = 1;
     } else {
-        lock(&ttys_lock, 0);
+        simple_lockt(&ttys_lock, 0);
         struct tty *tty = pty_slave.ttys[pty_num];
         assert(tty != NULL);
-        lock(&tty->lock, 0);
+        simple_lockt(&tty->lock, 0);
 
         stat->mode = S_IFCHR | tty->pty.perms;
         stat->uid = tty->pty.uid;
@@ -221,10 +221,10 @@ static int devpts_setattr_num(int pty_num, struct attr attr) {
     if (attr.type == attr_size)
         return _EINVAL;
 
-    lock(&ttys_lock, 0);
+    simple_lockt(&ttys_lock, 0);
     struct tty *tty = pty_slave.ttys[pty_num];
     assert(tty != NULL);
-    lock(&tty->lock, 0);
+    simple_lockt(&tty->lock, 0);
 
     switch (attr.type) {
         case attr_uid:
@@ -272,7 +272,7 @@ static int devpts_fsetattr(struct fd *fd, struct attr attr) {
 static int devpts_readdir(struct fd *fd, struct dir_entry *entry) {
     assert(fd->devpts.num == -1); // there shouldn't be anything to list but the root
 
-    int pty_num = fd->offset;
+    unsigned long pty_num = fd->offset;
     while (pty_num < MAX_PTYS && !devpts_pty_exists(pty_num))
         pty_num++;
     if (pty_num >= MAX_PTYS)

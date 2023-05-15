@@ -36,10 +36,10 @@ static int getpath(int fd, char *buf) {
 // useful for simulating mknodat on ios, dealing with long unix socket paths, etc
 lock_t fchdir_lock;
 static void lock_fchdir(int dirfd) {
-    lock(&fchdir_lock, 0);
+    simple_lockt(&fchdir_lock, 0);
     fchdir(dirfd);
 }
-static void unlock_fchdir() {
+static void unlock_fchdir(void) {
     unlock(&fchdir_lock);
 }
 
