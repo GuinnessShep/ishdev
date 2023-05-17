@@ -13,6 +13,10 @@
 #include "fs/tty.h"
 #include "fs/devices.h"
 
+extern int lock_init(lock_t *lock, const char *lname);
+extern void simple_lockt(lock_t *lock, int log_lock);
+extern void unlock(lock_t *lock);
+
 extern struct tty_driver ios_pty_driver;
 
 #if !ISH_LINUX

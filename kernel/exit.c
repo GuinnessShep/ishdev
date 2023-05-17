@@ -7,6 +7,7 @@
 #include "kernel/ptrace.h"
 #include "kernel/resource_locking.h"
 #include "fs/fd.h"
+#include "util/sync.h"
 #include "fs/tty.h"
 
 extern bool doEnableExtraLocking;

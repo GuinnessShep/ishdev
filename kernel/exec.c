@@ -15,6 +15,7 @@
 #include "kernel/errno.h"
 #include "fs/fd.h"
 #include "kernel/elf.h"
+#include "util/sync.h"
 #include "kernel/vdso.h"
 #include "kernel/resource_locking.h"
 #include "tools/ptraceomatic-config.h"

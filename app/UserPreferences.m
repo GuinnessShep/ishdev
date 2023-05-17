@@ -7,7 +7,7 @@
 
 #import "UserPreferences.h"
 #import "fs/proc/ish.h"
-#include "sync.h"
+#include "util/sync.h"
 #include "task.h"
 
 // Stuff to allow for cleaning up when doEnableExtraLocking is disabled.  -mke
@@ -43,6 +43,9 @@ NSDictionary<NSString *, NSString *> *kvoProperties;
 
 extern bool doEnableMulticore;
 extern unsigned doLockSleepNanoseconds;
+extern void complex_lockt(lock_t *lock, int log_lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line);
+extern void unlock_pids(lock_t *lock) ;
+
 static NSString *const kSystemMonospacedFontName = @"ui-monospace";
 
 @interface UserPreferences ()

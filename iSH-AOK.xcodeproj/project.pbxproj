@@ -105,6 +105,10 @@
 		497F6D5C254E609700C82F46 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = BB7D93822087C2890008DA78 /* main.c */; };
 		497F6D87254E62E100C82F46 /* libish.a in Frameworks */ = {isa = PBXBuildFile; fileRef = BB13F7DC200AD81D003D1C4D /* libish.a */; };
 		49FF844B2A06249F00850B7A /* (null) in Sources */ = {isa = PBXBuildFile; };
+		5D202C122A12D46E00B8A2E8 /* rlock.c in Sources */ = {isa = PBXBuildFile; fileRef = 5D202C0E2A12BFAE00B8A2E8 /* rlock.c */; };
+		5D202C132A12D47800B8A2E8 /* wrlock.c in Sources */ = {isa = PBXBuildFile; fileRef = 5D202C0F2A12BFAE00B8A2E8 /* wrlock.c */; };
+		5D202C142A12E3DE00B8A2E8 /* wrlock.c in Sources */ = {isa = PBXBuildFile; fileRef = 5D202C0F2A12BFAE00B8A2E8 /* wrlock.c */; };
+		5D202C152A12E3E900B8A2E8 /* rlock.c in Sources */ = {isa = PBXBuildFile; fileRef = 5D202C0E2A12BFAE00B8A2E8 /* rlock.c */; };
 		5D85FD1D2A10590000DDD121 /* ExceptionExfiltrator.m in Sources */ = {isa = PBXBuildFile; fileRef = 5D85FD1C2A10590000DDD121 /* ExceptionExfiltrator.m */; };
 		BB0F552E239F8A790032A2A1 /* Icons.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB0F552D239F8A790032A2A1 /* Icons.plist */; };
 		BB10E5C9248DBAAC009C7A74 /* libarchive.a in Frameworks */ = {isa = PBXBuildFile; fileRef = BB10E5C8248DBAA1009C7A74 /* libarchive.a */; platformFilter = ios; };
@@ -579,6 +583,8 @@
 		497F6CD3254E5CC800C82F46 /* bits.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = bits.h; sourceTree = "<group>"; };
 		497F6CE4254E5E4C00C82F46 /* MakeXcodeAutoCompleteWork */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = MakeXcodeAutoCompleteWork; sourceTree = BUILT_PRODUCTS_DIR; };
 		497F6D47254E605F00C82F46 /* ish-AOK */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; name = "ish-AOK"; path = ish; sourceTree = BUILT_PRODUCTS_DIR; };
+		5D202C0E2A12BFAE00B8A2E8 /* rlock.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = rlock.c; sourceTree = "<group>"; };
+		5D202C0F2A12BFAE00B8A2E8 /* wrlock.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = wrlock.c; sourceTree = "<group>"; };
 		5D272493277C20DF0005F2A8 /* iSHFileProviderRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iSHFileProviderRelease.entitlements; sourceTree = "<group>"; };
 		5D85FD1B2A10590000DDD121 /* ExceptionExfiltrator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ExceptionExfiltrator.h; sourceTree = "<group>"; };
 		5D85FD1C2A10590000DDD121 /* ExceptionExfiltrator.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ExceptionExfiltrator.m; sourceTree = "<group>"; };
@@ -1104,6 +1110,8 @@
 		BB7D93362087C2880008DA78 /* util */ = {
 			isa = PBXGroup;
 			children = (
+				5D202C0E2A12BFAE00B8A2E8 /* rlock.c */,
+				5D202C0F2A12BFAE00B8A2E8 /* wrlock.c */,
 				497F6CD3254E5CC800C82F46 /* bits.h */,
 				497F6CCF254E5CC800C82F46 /* fifo.c */,
 				497F6CCB254E5CC800C82F46 /* fifo.h */,
@@ -2011,6 +2019,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5D202C152A12E3E900B8A2E8 /* rlock.c in Sources */,
+				5D202C142A12E3DE00B8A2E8 /* wrlock.c in Sources */,
 				497F6CF5254E5EA500C82F46 /* float80-test.c in Sources */,
 				497F6CF6254E5EA500C82F46 /* float80.c in Sources */,
 				497F6CF7254E5EA500C82F46 /* fpu.c in Sources */,
@@ -2108,6 +2118,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5D202C132A12D47800B8A2E8 /* wrlock.c in Sources */,
+				5D202C122A12D46E00B8A2E8 /* rlock.c in Sources */,
 				BB28C7BB268975AE00BDC834 /* LocationDevice.m in Sources */,
 				BB28C7BA268975AA00BDC834 /* iOSFS.m in Sources */,
 				BB28C7BC268975B000BDC834 /* PasteboardDevice.m in Sources */,
@@ -2316,7 +2328,8 @@
 			baseConfigurationReference = BB0B86D52587009D00208600 /* iOS.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = UYU5FM4LQ4;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2325,6 +2338,7 @@
 					"@loader_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "app.ish.iSH-AOK";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "fs/proc/MakeXcodeAutoCompleteWork-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -2336,7 +2350,8 @@
 			baseConfigurationReference = BB0B86D52587009D00208600 /* iOS.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = UYU5FM4LQ4;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2345,6 +2360,7 @@
 					"@loader_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "app.ish.iSH-AOK";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "fs/proc/MakeXcodeAutoCompleteWork-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};
@@ -2715,7 +2731,8 @@
 			baseConfigurationReference = BB0B86D52587009D00208600 /* iOS.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = UYU5FM4LQ4;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2724,6 +2741,7 @@
 					"@loader_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "app.ish.iSH-AOK";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "fs/proc/MakeXcodeAutoCompleteWork-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -3040,7 +3058,8 @@
 			baseConfigurationReference = BB0B86D52587009D00208600 /* iOS.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = UYU5FM4LQ4;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -3049,6 +3068,7 @@
 					"@loader_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "app.ish.iSH-AOK";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "fs/proc/MakeXcodeAutoCompleteWork-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};

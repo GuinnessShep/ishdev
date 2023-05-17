@@ -4,7 +4,6 @@
 #include <string.h>
 #include "kernel/calls.h"
 #include "kernel/task.h"
-#include "kernel/task.h"
 #include "kernel/resource_locking.h"
 #include "emu/memory.h"
 #include "emu/tlb.h"
@@ -175,7 +174,7 @@ void task_destroy(struct task *task) {
     }
 
     bool Ishould = false;
-    if(!trylock(&pids_lock)) {  // Just in case, be sure pids_lock is set.  -mke
+    if(!trylock(&pids_lock, __FILE_NAME__, __LINE__)) {  // Just in case, be sure pids_lock is set.  -mke
         
         // Multiple threads in the same process tend to cause deadlocks when locking pids_lock.  So we skip the second attempt to lock pids_lock by the same pid.  Which
         // sometimes causes pids_lock not to be set.  We lock it here, and then unlock below.  -mke

@@ -1,0 +1,271 @@
+#include <stdatomic.h>
+#include <pthread.h>
+#include <stdbool.h>
+#include <setjmp.h>
+#include<errno.h>
+#include "misc.h"
+#include "debug.h"
+#include "util/sync.h"
+#include <strings.h>
+
+// R/W locks, implemented using pthread
+
+#define LOCK_DEBUG 0
+
+// A safer string copy function that guarantees null-termination.
+void safe_strncpy(char *dest, const char *src, size_t dest_size) {
+    strncpy(dest, src, dest_size - 1);
+    dest[dest_size - 1] = '\0';
+}
+
+int safe_mutex_lock(pthread_mutex_t *mutex) {
+    int res = pthread_mutex_lock(mutex);
+    if (res != 0) {
+        printk("ERROR: locking mutex: %d\n", res);
+        exit(EXIT_FAILURE); // Exit on failure
+    }
+    return res;
+}
+
+int safe_mutex_unlock(pthread_mutex_t *mutex) {
+    int res = pthread_mutex_unlock(mutex);
+    if (res != 0) {
+        printk("ERROR: unlocking mutex: %d\n", res);
+        exit(EXIT_FAILURE); // Exit on failure
+    }
+    return res;
+}
+
+static inline void _read_unlock(wrlock_t *lock, const char*, int);
+static inline void _write_unlock(wrlock_t *lock, const char*, int);
+void write_unlock_and_destroy(wrlock_t *lock);
+
+int lock_reads_pending_count(wrlock_t *lock, int increment) {
+    safe_mutex_lock(&lock->m);
+    if(increment)
+        lock->reads_pending++;
+    int rpend = atomic_load(&lock->reads_pending);
+    safe_mutex_unlock(&lock->m);
+    return rpend;
+}
+
+int unlock_reads_pending_count(wrlock_t *lock) {
+    pthread_rwlock_rdlock(&lock->read_pending_lock);
+    atomic_fetch_sub(&lock->reads_pending, 1); // Use atomic decrement
+    if(atomic_load(&lock->reads_pending) < 0)
+        atomic_store(&lock->reads_pending, 0); // Use atomic store
+    int rpend = atomic_load(&lock->reads_pending); // Use atomic read
+    pthread_rwlock_unlock(&lock->read_pending_lock); // Add unlock before returning
+    return rpend;
+}
+
+static inline void _read_unlock(wrlock_t *lock, const char *file, int line) {
+    assert(atomic_load(&lock->val) > 0);
+    atomic_fetch_sub(&lock->val, 1);
+    if(atomic_load(&lock->val) < 0) {
+        printk("ERROR: read_unlock(%x) error(PID: %d Process: %s count %d) (%s:%d)\n",lock, current_pid(), current_comm(), atomic_load(&lock->val), file, line);
+        lock->pid = -1;
+        lock->comm[0] = 0;
+        modify_locks_held_count_wrapper(-1);
+        pthread_rwlock_unlock(&lock->l);
+        return;
+    }
+    pthread_rwlock_unlock(&lock->l);
+    modify_locks_held_count_wrapper(-1);
+}
+
+void read_unlock(wrlock_t *lock, const char *file, int line) {
+    atomic_l_lockf("r_unlock\0", __FILE_NAME__, __LINE__);
+    _read_unlock(lock, file, line);
+    pthread_mutex_lock(&lock->m);
+    pthread_cond_signal(&lock->cond);
+    pthread_mutex_unlock(&lock->m);
+    atomic_l_unlockf("r_unlock\0", __FILE_NAME__, __LINE__);
+}
+
+static inline void _write_unlock(wrlock_t *lock, const char *file, int line) {
+    int lval = atomic_load(&lock->val);
+    
+    atomic_fetch_add(&lock->val, 1);
+
+    lock->line = 0;
+    lock->pid = -1;
+    lock->comm[0] = 0;
+    lock->file = NULL;
+    modify_locks_held_count_wrapper(-1);
+    
+    if(pthread_rwlock_unlock(&lock->l) != 0)
+        printk("URGENT: write_unlock(%x:%d) error(PID: %d Process: %s) (%s:%d)\n", lock, atomic_load(&lock->val), current_pid(), current_comm(), file, line);
+}
+
+void write_unlock(wrlock_t *lock, const char *file, int line) {
+    atomic_l_lockf("w_unlock\0", __FILE_NAME__, __LINE__);
+    _write_unlock(lock, file, line);
+    atomic_l_unlockf("w_unlock\0", __FILE_NAME__, __LINE__);
+}
+
+static inline void _write_lock(wrlock_t *lock, const char *file, int line) {
+    atomic_fetch_add(&lock->val, -1);
+
+    lock->file = file;
+    lock->line = line;
+    lock->pid = current_pid();
+    if (lock->pid > 9) {
+        strncpy(lock->comm, current_comm(), 15);
+        lock->comm[15] = '\0'; // Ensure null termination
+    }
+}
+
+void write_lock(wrlock_t *lock, const char *file, int line) {
+    pthread_mutex_lock(&lock->m);
+    while (atomic_load(&lock->val) > 0) {
+        pthread_cond_wait(&lock->cond, &lock->m);
+    }
+    atomic_l_lockf("w_lock", __FILE_NAME__, __LINE__);
+    _write_lock(lock, file, line);
+    atomic_l_unlockf("w_lock", __FILE_NAME__, __LINE__);
+    pthread_mutex_unlock(&lock->m);
+}
+
+static inline int trylockw(wrlock_t *lock, const char *file, int line) {
+    atomic_l_lockf("trylockw\0", __FILE_NAME__, __LINE__);
+    int status = pthread_rwlock_trywrlock(&lock->l);
+
+#if LOCK_DEBUG
+    if (!status) {
+        lock->file = file;
+        lock->line = line;
+        lock->pid = current_pid();
+        atomic_fetch_add(&lock->val, 1);
+    }
+#endif
+
+    if(!status) {
+        modify_locks_held_count_wrapper(1);
+        lock->pid = current_pid();
+        strncpy(lock->comm, current_comm(), 15);
+        lock->comm[15] = '\0'; // Ensure null termination
+        atomic_fetch_add(&lock->val, 1);
+    }
+    atomic_l_unlockf("trylockw\0", __FILE_NAME__, __LINE__);
+    return status;
+}
+
+#define trylockw(lock) trylockw(lock, __FILE_NAME__, __LINE__)
+
+void read_to_write_lock(wrlock_t *lock);
+static inline void read_unlock_and_destroy(wrlock_t *lock);
+
+// this is a read-write lock that prefers writers, i.e. if there are any
+// writers waiting a read lock will block.
+// on darwin pthread_rwlock_t is already like this, on linux you can configure
+// it to prefer writers. not worrying about anything else right now.
+
+void wrlock_init(wrlock_t *lock) {
+    pthread_rwlockattr_t *pattr = NULL;
+#if defined(__GLIBC__)
+    pthread_rwlockattr_t attr;
+    pattr = &attr;
+    pthread_rwlockattr_init(pattr);
+    pthread_rwlockattr_setkind_np(pattr, PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP);
+#endif
+#ifdef JUSTLOG
+    if (pthread_rwlock_init(&lock->l, pattr))
+        printk("URGENT: wrlock_init() 'l' error(PID: %d Process: %s)\n",current_pid(), current_comm());
+    if (pthread_mutex_init(&lock->m, NULL))
+        printk("URGENT: wrlock_init() 'm' error(PID: %d Process: %s)\n",current_pid(), current_comm());
+#else
+    if (pthread_rwlock_init(&lock->l, pattr)) __builtin_trap();
+#endif
+    atomic_init(&lock->val, 0);
+    lock->line = lock->pid = lock->reads_pending = 0;
+    //strcpy(lock->comm,NULL);
+    pthread_rwlock_init(&lock->read_pending_lock, NULL);
+    lock->file = NULL;
+}
+
+static inline void _write_lock_destroy(wrlock_t *lock) {
+    while((critical_region_count_wrapper() > 1) && (current_pid() != 1) && lock_reads_pending_count(lock, 0)) { // Wait for now, task is in one or more critical sections
+        nanosleep(&lock_pause, NULL);
+    }
+#ifdef JUSTLOG
+    if (pthread_rwlock_destroy(&lock->l) != 0) {
+        printk("URGENT: write_lock_destroy(%x) on active lock. (PID: %d Process: %s Critical Region Count: %d)\n",&lock->l, current_pid(), current_comm(),critical_region_count_wrapper());
+    }
+#else
+    if (pthread_rwlock_destroy(&lock->l) != 0) __builtin_trap();
+#endif
+}
+
+void write_lock_destroy(wrlock_t *lock) {
+    while((critical_region_count_wrapper() > 1) && (current_pid() != 1)) { // Wait for now, task is in one or more critical sections
+        nanosleep(&lock_pause, NULL);
+    }
+    
+    atomic_l_lockf("l_destroy\0", __FILE_NAME__, __LINE__);
+    _write_lock_destroy(lock);
+    atomic_l_unlockf("l_destroy\0", __FILE_NAME__, __LINE__);
+}
+
+static inline void _read_lock(wrlock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line) {
+    //lock_reads_pending_count(lock, 1);
+    atomic_fetch_add(&lock->reads_pending, 1);
+    pthread_rwlock_rdlock(&lock->l);
+    atomic_fetch_sub(&lock->reads_pending, 1);
+    atomic_fetch_add(&lock->val, 1);
+    //unlock_reads_pending_count(lock);
+    
+    lock->pid = current_pid();
+    if(lock->pid > 9)
+        strncpy((char *)lock->comm, current_comm(), 16);
+    
+    return;
+    
+}
+
+void read_lock(wrlock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line) { // Wrapper so that external calls lock, internal calls using _read_unlock() don't -mke
+    int foo;
+    if(lock < 0)
+        foo = 1;
+    atomic_l_lockf("r_lock\0", __FILE_NAME__, __LINE__);
+    _read_lock(lock, file, line);
+    atomic_l_unlockf("r_lock\0", __FILE_NAME__, __LINE__);
+}
+
+void read_to_write_lock(wrlock_t *lock) {  // Try to atomically swap a RO lock to a Write lock.  -mke
+    modify_critical_region_counter_wrapper(1, __FILE_NAME__, __LINE__);
+    atomic_l_lockf("rtw_lock\0", __FILE_NAME__, __LINE__);
+    _read_unlock(lock, __FILE_NAME__, __LINE__);
+    _write_lock(lock, __FILE_NAME__, __LINE__);
+    atomic_l_unlockf("rtw_lock\0", __FILE_NAME__, __LINE__);
+    modify_critical_region_counter_wrapper(-1, __FILE_NAME__, __LINE__);
+}
+
+void write_to_read_lock(wrlock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line) { // Try to atomically swap a Write lock to a RO lock.  -mke
+    modify_critical_region_counter_wrapper(1, __FILE_NAME__, __LINE__);
+    atomic_l_lockf("wtr_lock\0", __FILE_NAME__, __LINE__);
+    _write_unlock(lock, file, line);
+    _read_lock(lock, file, line);
+    atomic_l_unlockf("wtr_lock\0", __FILE_NAME__, __LINE__);
+    modify_critical_region_counter_wrapper(-1, __FILE_NAME__, __LINE__);
+}
+
+void write_unlock_and_destroy(wrlock_t *lock) {
+    modify_critical_region_counter_wrapper(1, __FILE_NAME__, __LINE__);
+
+    atomic_l_lockf("wuad_lock\0", __FILE_NAME__, __LINE__);
+    _write_unlock(lock, __FILE_NAME__, __LINE__);
+    _write_lock_destroy(lock);
+    atomic_l_unlockf("wuad_lock\0", __FILE_NAME__, __LINE__);
+    modify_critical_region_counter_wrapper(-1, __FILE_NAME__, __LINE__);
+}
+
+void read_unlock_and_destroy(wrlock_t *lock) {
+    //modify_critical_region_counter_wrapper(1, __FILE_NAME__, __LINE__);
+    atomic_l_lockf("ruad_lock", __FILE_NAME__, __LINE__);
+   // if(trylockw(lock)) // It should be locked, but just in case.  Likely masking underlying issue.  -mke
+    //    _read_unlock(lock, __FILE_NAME__, __LINE__);
+    _write_lock_destroy(lock);
+    atomic_l_unlockf("ruad_lock", __FILE_NAME__, __LINE__);
+    //modify_critical_region_counter_wrapper(-1, __FILE_NAME__, __LINE__);
+}

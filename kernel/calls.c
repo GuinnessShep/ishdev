@@ -3,6 +3,7 @@
 #include "kernel/calls.h"
 #include "emu/interrupt.h"
 #include "emu/memory.h"
+#include "util/sync.h"
 #include "kernel/signal.h"
 #include "kernel/task.h"
 #include "kernel/resource_locking.h"

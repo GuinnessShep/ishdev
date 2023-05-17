@@ -45,12 +45,39 @@ void mem_init(struct mem *mem) {
 
 void mem_destroy(struct mem *mem) {
     write_lock(&mem->lock, __FILE_NAME__, __LINE__);
-    while((critical_region_count(current) > 1) && (current->pid > 1) ){ // Wait for now, task is in one or more critical sections, and/or has locks
+    pt_unmap_always(mem, 0, MEM_PAGES);
+#if ENGINE_JIT
+    jit_free(mem->mmu.jit);
+#endif
+    for (int i = 0; i < MEM_PGDIR_SIZE; i++) {
+        if (mem->pgdir[i] != NULL)
+            free(mem->pgdir[i]);
+    }
+    free(mem->pgdir);
+    write_unlock_and_destroy(&mem->lock); 
+}
+
+/*
+void mem_destroy(struct mem *mem) {
+    int check;
+    
+    do { // Loop until there are no pending reads for this memory
+        check = atomic_load(&mem->lock.reads_pending);
+        while(check) {
+            check = atomic_load(&mem->lock.reads_pending);
+        }
+        write_lock(&mem->lock, __FILE_NAME__, __LINE__);
+        if(atomic_load(&mem->lock.reads_pending)) {
+           write_unlock(&mem->lock, __FILE_NAME__, __LINE__);
+        }
+    } while(check);
+       
+    while((critical_region_count(current) > 1) && (current->pid > 1) ) { // Wait for now, task is in one or more critical sections, and/or has locks
         nanosleep(&lock_pause, NULL);
     }
     pt_unmap_always(mem, 0, MEM_PAGES);
 #if ENGINE_JIT
-    while((critical_region_count(current) > 1) && (current->pid > 1) ){ // Wait for now, task is in one or more critical sections, and/or has locks
+    while((critical_region_count(current) > 1) && (current->pid > 1) ) { // Wait for now, task is in one or more critical sections, and/or has locks
         nanosleep(&lock_pause, NULL);
     }
     jit_free(mem->mmu.jit);
@@ -62,12 +89,9 @@ void mem_destroy(struct mem *mem) {
             nanosleep(&lock_pause, NULL);
         } while((critical_region_count(current) > 1) && (current->pid > 1) && (count < 5000000)); // Wait for now, task is in one or more critical sections
         
-        
         if (mem->pgdir[i] != NULL)
             free(mem->pgdir[i]);
     }
-
-    //modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
 
     do {
         nanosleep(&lock_pause, NULL);
@@ -78,10 +102,8 @@ void mem_destroy(struct mem *mem) {
     mem->pgdir = NULL; //mkemkemke Trying something here
     
     write_unlock_and_destroy(&mem->lock);
-    
-    //modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
-    
 }
+*/
 
 #define PGDIR_TOP(page) ((page) >> 10)
 #define PGDIR_BOTTOM(page) ((page) & (MEM_PGDIR_SIZE - 1))

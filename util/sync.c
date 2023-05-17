@@ -33,6 +33,7 @@ static bool is_signal_pending(lock_t *lock) {
     return pending;
 }
 
+/*
 void modify_critical_region_counter(struct task *task, int value, __attribute__((unused)) const char *file, __attribute__((unused)) int line) { // value Should only be -1 or 1.  -mke
     
     if(!doEnableExtraLocking) // If they want to fly by the seat of their pants...  -mke
@@ -61,8 +62,23 @@ void modify_critical_region_counter(struct task *task, int value, __attribute__(
         return;
     }
     
-        
 }
+*/
+void modify_critical_region_counter(struct task *task, int value, __attribute__((unused)) const char *file, __attribute__((unused)) int line) {
+    
+    if(!doEnableExtraLocking || task == NULL || task->exiting || task->pid < 9)
+        return;
+
+    unsigned old_value = atomic_load(&task->critical_region.count);
+    atomic_fetch_add(&task->critical_region.count, value);
+
+    unsigned new_value = atomic_load(&task->critical_region.count);
+    
+    if(new_value > old_value && value < 0) {
+        printk("ERROR: critical_region count underflow, (%s:%d) (%u - %d) (%s:%d)\n", task->comm, task->pid, old_value, value, file, line);
+    }
+}
+
 
 void modify_critical_region_counter_wrapper(int value, __attribute__((unused)) const char *file, __attribute__((unused)) int line) { // sync.h can't know about the definition of task struct due to recursive include files.  -mke
     if((current != NULL) && (doEnableExtraLocking))

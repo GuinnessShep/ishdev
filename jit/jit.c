@@ -7,6 +7,7 @@
 #include "emu/memory.h"
 #include "emu/interrupt.h"
 #include "util/list.h"
+#include "util/sync.h"
 #include "kernel/task.h"
 #include "kernel/resource_locking.h"
 

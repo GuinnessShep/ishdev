@@ -82,7 +82,7 @@ retry:
         simple_lockt(&task->waiting_cond_lock, 0);
         if (task->waiting_cond != NULL) {
             bool mine = false;
-            if (trylock(task->waiting_lock) == EBUSY) {
+            if (trylock(task->waiting_lock, __FILE_NAME__, __LINE__) == EBUSY) {
                 if (pthread_equal(task->waiting_lock->owner, pthread_self()))
                     mine = true;
                 if (!mine) {

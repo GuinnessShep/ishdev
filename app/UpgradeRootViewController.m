@@ -11,7 +11,10 @@
 #import "CurrentRoot.h"
 #include "kernel/calls.h"
 #include "kernel/init.h"
+#include "util/sync.h"
 #include "fs/devices.h"
+
+extern void complex_lockt(lock_t *lock, int log_lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line);
 
 @interface UpgradeRootViewController ()
 
@@ -24,6 +27,8 @@
 @end
 
 @implementation UpgradeRootViewController
+
+extern void unlock_pids(lock_t *lock);
 
 - (void)viewDidLoad {
     [super viewDidLoad];
