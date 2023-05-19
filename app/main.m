@@ -21,10 +21,24 @@ void disable_app_nap(void)
 #import "ExceptionExfiltrator.h"
 
 int main(int argc, char * argv[]) {
+/*    NSString *appContainerPath = NSHomeDirectory();
+    NSString *documentsPath = [appContainerPath stringByAppendingPathComponent:@"iCloud"];
+    NSString *filePath = [documentsPath stringByAppendingPathComponent:@"iSH-AOK_outputfile.txt"];
+    FILE *newStdout = freopen([filePath UTF8String], "a+", stdout);
+    if (newStdout == NULL) {
+        NSLog(@"Failed to open file for stdout: %@", filePath);
+        // Handle error
+    }
+    NSString *filePathE = [documentsPath stringByAppendingPathComponent:@"iSH-AOK_errorfile.txt"];
+    FILE *newStderr = freopen([filePathE UTF8String], "a+", stderr);
+    if (newStderr == NULL) {
+        NSLog(@"Failed to open file for stderr: %@", filePathE);
+        // Handle error
+    } */
+    run_at_boot();
     NSSetUncaughtExceptionHandler(iSHExceptionHandler);
     @autoreleasepool {
         disable_app_nap();  // No napping I say. -mke
-        run_at_boot();
         return UIApplicationMain(argc, argv, nil, NSStringFromClass([AppDelegate class]));
     }
 }

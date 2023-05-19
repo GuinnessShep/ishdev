@@ -151,6 +151,8 @@ if get_option('kernel') == 'ish'
 
         'util/timer.c',
         'util/sync.c',
+        'util/wrlock.c',
+        'util/rlock.c',
         'util/fifo.c',
 
         'emu/memory.c',

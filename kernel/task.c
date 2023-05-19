@@ -221,14 +221,14 @@ void run_at_boot(void) {  // Stuff we run only once, at boot time.
     struct uname uts;
     do_uname(&uts);
     unsigned short ncpu = get_cpu_count();
-    lock_init(&pids_lock, "pids\0");
-    lock_init(&block_lock, "block\0");
-    lock_init(&atomic_l_lock, "run_at_boot\0");
+    if(!lock_init(&pids_lock, "pids\0") ||
+       !lock_init(&block_lock, "block\0")) {
+        printk("ERROR: initializing internal locks at boot\n");
+    }
+       
+    init_recursive_mutex(); // Initialize the atomic locking lock
     printk("iSH-AOK %s booted on %d emulated %s CPU(s)\n",uts.release, ncpu, uts.arch);
-   // API_UNAVAILABLE(macos) API_AVAILABLE(ios(13.0))
-    //size_t proc_mem_avail = os_proc_available_memory();
-   // if(proc_mem_avail > 0)
-   //     printk("%d memory available for iSH-AOK\n", proc_mem_avail);
+
     // Get boot time
     extern time_t boot_time;
          

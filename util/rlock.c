@@ -39,13 +39,6 @@ int lock_init(lock_t *lock, const char *lname) {
     return 0; // success
 }
 
-
-#if LOCK_DEBUG
-#define LOCK_INITIALIZER {PTHREAD_MUTEX_INITIALIZER, 0, { .initialized = true }}
-#else
-#define LOCK_INITIALIZER {PTHREAD_MUTEX_INITIALIZER, 0}
-#endif
-
 void complex_lockt(lock_t *lock, int log_lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line) {
     // "Advanced" locking for some things.  pids_lock for instance
     //if(lock->pid == current_pid())
@@ -138,10 +131,7 @@ void unlock(lock_t *lock) {
 }
 
 int trylock(lock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line) {
-    //modify_critical_region_counter_wrapper(1,__FILE_NAME__, __LINE__);
-    atomic_l_lockf("trylock\0", __FILE_NAME__, __LINE__);
     int status = pthread_mutex_trylock(&lock->m);
-    atomic_l_unlockf("trylock\0", __FILE_NAME__, __LINE__);
 #if LOCK_DEBUG
     if (!status) {
         lock->debug.file = file;

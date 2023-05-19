@@ -98,7 +98,7 @@ struct uptime_info get_uptime() {
     return uptime;
 }
 
-int get_cpu_count() {
+int get_cpu_count(void) {
      int ncpu;
      size_t size = sizeof(int);
      if((!doEnableMulticore) && (!BOOTING))

@@ -282,13 +282,19 @@ dword_t sys_exit_group(dword_t status) {
 static bool reap_if_zombie(struct task *task, struct siginfo_ *info_out, struct rusage_ *rusage_out, int options) {
     if (!task->zombie)
         return false;
-    bool signal_pending = !!(task->pending & ~task->blocked);
+    bool signal_pending;
+    simple_lockt(&task->general_lock, 0);
+    signal_pending = !!(task->pending & ~task->blocked);
+    unlock(&task->general_lock);
+    
     while(((signal_pending) ||
            (critical_region_count(task) > 1) ||
            (locks_held_count(task))) &&
            (task->pid > 10)) {
         nanosleep(&lock_pause, NULL);
+        simple_lockt(&task->general_lock, 0);
         signal_pending = !!(task->pending & ~task->blocked);
+        unlock(&task->general_lock);
     }
     complex_lockt(&task->group->lock, 0, __FILE_NAME__, __LINE__);
 

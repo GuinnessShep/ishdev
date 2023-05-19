@@ -10,7 +10,7 @@
 
 extern bool doEnableExtraLocking;
 
-struct mm *mm_new() {
+struct mm *mm_new(void) {
     struct mm *mm = malloc(sizeof(struct mm));
     if (mm == NULL)
         return NULL;

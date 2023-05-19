@@ -12,6 +12,8 @@
 
 #define LOCK_DEBUG 0
 
+void safe_strncpy(char *dest, const char *src, size_t dest_size);
+
 // A safer string copy function that guarantees null-termination.
 void safe_strncpy(char *dest, const char *src, size_t dest_size) {
     strncpy(dest, src, dest_size - 1);
@@ -75,12 +77,12 @@ static inline void _read_unlock(wrlock_t *lock, const char *file, int line) {
 }
 
 void read_unlock(wrlock_t *lock, const char *file, int line) {
-    atomic_l_lockf("r_unlock\0", __FILE_NAME__, __LINE__);
+    atomic_l_lockf(lock, "r_unlock\0", __FILE_NAME__, __LINE__);
     _read_unlock(lock, file, line);
     pthread_mutex_lock(&lock->m);
     pthread_cond_signal(&lock->cond);
     pthread_mutex_unlock(&lock->m);
-    atomic_l_unlockf("r_unlock\0", __FILE_NAME__, __LINE__);
+    atomic_l_unlockf(lock, "r_unlock\0", __FILE_NAME__, __LINE__);
 }
 
 static inline void _write_unlock(wrlock_t *lock, const char *file, int line) {
@@ -99,9 +101,9 @@ static inline void _write_unlock(wrlock_t *lock, const char *file, int line) {
 }
 
 void write_unlock(wrlock_t *lock, const char *file, int line) {
-    atomic_l_lockf("w_unlock\0", __FILE_NAME__, __LINE__);
+    atomic_l_lockf(lock, "w_unlock\0", __FILE_NAME__, __LINE__);
     _write_unlock(lock, file, line);
-    atomic_l_unlockf("w_unlock\0", __FILE_NAME__, __LINE__);
+    atomic_l_unlockf(lock, "w_unlock\0", __FILE_NAME__, __LINE__);
 }
 
 static inline void _write_lock(wrlock_t *lock, const char *file, int line) {
@@ -121,14 +123,14 @@ void write_lock(wrlock_t *lock, const char *file, int line) {
     while (atomic_load(&lock->val) > 0) {
         pthread_cond_wait(&lock->cond, &lock->m);
     }
-    atomic_l_lockf("w_lock", __FILE_NAME__, __LINE__);
+    atomic_l_lockf(lock, "w_lock", __FILE_NAME__, __LINE__);
     _write_lock(lock, file, line);
-    atomic_l_unlockf("w_lock", __FILE_NAME__, __LINE__);
+    atomic_l_unlockf(lock, "w_lock", __FILE_NAME__, __LINE__);
     pthread_mutex_unlock(&lock->m);
 }
 
 static inline int trylockw(wrlock_t *lock, const char *file, int line) {
-    atomic_l_lockf("trylockw\0", __FILE_NAME__, __LINE__);
+    atomic_l_lockf(lock, "trylockw\0", __FILE_NAME__, __LINE__);
     int status = pthread_rwlock_trywrlock(&lock->l);
 
 #if LOCK_DEBUG
@@ -147,7 +149,7 @@ static inline int trylockw(wrlock_t *lock, const char *file, int line) {
         lock->comm[15] = '\0'; // Ensure null termination
         atomic_fetch_add(&lock->val, 1);
     }
-    atomic_l_unlockf("trylockw\0", __FILE_NAME__, __LINE__);
+    atomic_l_unlockf(lock, "trylockw\0", __FILE_NAME__, __LINE__);
     return status;
 }
 
@@ -202,9 +204,9 @@ void write_lock_destroy(wrlock_t *lock) {
         nanosleep(&lock_pause, NULL);
     }
     
-    atomic_l_lockf("l_destroy\0", __FILE_NAME__, __LINE__);
+    atomic_l_lockf(lock, "l_destroy\0", __FILE_NAME__, __LINE__);
     _write_lock_destroy(lock);
-    atomic_l_unlockf("l_destroy\0", __FILE_NAME__, __LINE__);
+    atomic_l_unlockf(lock, "l_destroy\0", __FILE_NAME__, __LINE__);
 }
 
 static inline void _read_lock(wrlock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line) {
@@ -227,45 +229,45 @@ void read_lock(wrlock_t *lock, __attribute__((unused)) const char *file, __attri
     int foo;
     if(lock < 0)
         foo = 1;
-    atomic_l_lockf("r_lock\0", __FILE_NAME__, __LINE__);
+    atomic_l_lockf(lock, "r_lock\0", __FILE_NAME__, __LINE__);
     _read_lock(lock, file, line);
-    atomic_l_unlockf("r_lock\0", __FILE_NAME__, __LINE__);
+    atomic_l_unlockf(lock, "r_lock\0", __FILE_NAME__, __LINE__);
 }
 
 void read_to_write_lock(wrlock_t *lock) {  // Try to atomically swap a RO lock to a Write lock.  -mke
     modify_critical_region_counter_wrapper(1, __FILE_NAME__, __LINE__);
-    atomic_l_lockf("rtw_lock\0", __FILE_NAME__, __LINE__);
+    atomic_l_lockf(lock, "rtw_lock\0", __FILE_NAME__, __LINE__);
     _read_unlock(lock, __FILE_NAME__, __LINE__);
     _write_lock(lock, __FILE_NAME__, __LINE__);
-    atomic_l_unlockf("rtw_lock\0", __FILE_NAME__, __LINE__);
+    atomic_l_unlockf(lock, "rtw_lock\0", __FILE_NAME__, __LINE__);
     modify_critical_region_counter_wrapper(-1, __FILE_NAME__, __LINE__);
 }
 
 void write_to_read_lock(wrlock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line) { // Try to atomically swap a Write lock to a RO lock.  -mke
     modify_critical_region_counter_wrapper(1, __FILE_NAME__, __LINE__);
-    atomic_l_lockf("wtr_lock\0", __FILE_NAME__, __LINE__);
+    atomic_l_lockf(lock, "wtr_lock\0", __FILE_NAME__, __LINE__);
     _write_unlock(lock, file, line);
     _read_lock(lock, file, line);
-    atomic_l_unlockf("wtr_lock\0", __FILE_NAME__, __LINE__);
+    atomic_l_unlockf(lock, "wtr_lock\0", __FILE_NAME__, __LINE__);
     modify_critical_region_counter_wrapper(-1, __FILE_NAME__, __LINE__);
 }
 
 void write_unlock_and_destroy(wrlock_t *lock) {
     modify_critical_region_counter_wrapper(1, __FILE_NAME__, __LINE__);
 
-    atomic_l_lockf("wuad_lock\0", __FILE_NAME__, __LINE__);
+    atomic_l_lockf(lock, "wuad_lock\0", __FILE_NAME__, __LINE__);
     _write_unlock(lock, __FILE_NAME__, __LINE__);
     _write_lock_destroy(lock);
-    atomic_l_unlockf("wuad_lock\0", __FILE_NAME__, __LINE__);
+    atomic_l_unlockf(lock, "wuad_lock\0", __FILE_NAME__, __LINE__);
     modify_critical_region_counter_wrapper(-1, __FILE_NAME__, __LINE__);
 }
 
 void read_unlock_and_destroy(wrlock_t *lock) {
     //modify_critical_region_counter_wrapper(1, __FILE_NAME__, __LINE__);
-    atomic_l_lockf("ruad_lock", __FILE_NAME__, __LINE__);
+    atomic_l_lockf(lock, "ruad_lock", __FILE_NAME__, __LINE__);
    // if(trylockw(lock)) // It should be locked, but just in case.  Likely masking underlying issue.  -mke
     //    _read_unlock(lock, __FILE_NAME__, __LINE__);
     _write_lock_destroy(lock);
-    atomic_l_unlockf("ruad_lock", __FILE_NAME__, __LINE__);
+    atomic_l_unlockf(lock, "ruad_lock", __FILE_NAME__, __LINE__);
     //modify_critical_region_counter_wrapper(-1, __FILE_NAME__, __LINE__);
 }

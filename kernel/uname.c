@@ -13,18 +13,29 @@ const char *uname_version = "iSH-AOK";
 char *uname_hostname_override = NULL;
 
 
+#define BUILD_DATE_SIZE 100
+
 void do_uname(struct uname *uts) {
+    if(uts == NULL) {
+        return;
+    }
+
     struct utsname real_uname;
-    uname(&real_uname);
-    char *hostname = real_uname.nodename;
-    if (uname_hostname_override)
-        hostname = uname_hostname_override;
+    if (uname(&real_uname) == -1) {
+        return;  // or handle error as appropriate
+    }
+
+    const char *hostname = uname_hostname_override ? uname_hostname_override : real_uname.nodename;
     
-    // Get current date and format it in a sane way.  -mke
+    // Get current date and format it in a sane way
     char build_date[100];
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
-    strftime(build_date, sizeof(build_date)-1, "%Y-%m-%d %H:%M", t);
+
+    if(t == NULL) {
+        return;  // or handle error as appropriate
+    }
+    strftime(build_date, sizeof(build_date), "%Y-%m-%d %H:%M", t);
 
     static const struct uname u = {
         .arch = "i686",
@@ -32,10 +43,12 @@ void do_uname(struct uname *uts) {
         .release = "4.20.69-ish_aok",
         .system = "Linux"
     };
-    *uts = u; // Implicit memcpy
-    strcpy(uts->hostname, hostname);
+    *uts = u;
+    strncpy(uts->hostname, hostname, sizeof(uts->hostname) - 1);
+    uts->hostname[sizeof(uts->hostname) - 1] = '\0';
     snprintf(uts->version, sizeof(uts->version), "%s %s", uname_version, build_date);
 }
+
 
 dword_t sys_uname(addr_t uts_addr) {
     struct uname uts;

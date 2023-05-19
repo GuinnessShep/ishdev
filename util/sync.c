@@ -203,18 +203,19 @@ void sigusr1_handler(void) {
     }
 }
 
-// Because sometimes we can't #include "kernel/task.h" -mke
+
 unsigned critical_region_count(struct task *task) {
     unsigned tmp = 0;
-//    pthread_mutex_lock(task->critical_region.lock); // This would make more
+    pthread_mutex_lock(&task->critical_region.lock);
     tmp = task->critical_region.count;
     if(tmp > 1000)  // Not likely
         tmp = 0;
- //   pthread_mutex_unlock(task->critical_region.lock);
+    pthread_mutex_unlock(&task->critical_region.lock);
 
     return tmp;
 }
 
+// Because sometimes we can't #include "kernel/task.h" -mke
 unsigned critical_region_count_wrapper(void) { // sync.h can't know about the definition of struct due to recursive include files.  -mke
     return(critical_region_count(current));
 }
@@ -227,7 +228,6 @@ bool current_is_valid(void) {
 }
 
 unsigned locks_held_count(struct task *task) {
-   // return 0; // Short circuit for now
     if(task->pid < 10)  // Here be monsters.  -mke
         return 0;
     if(task->locks_held.count > 0) {

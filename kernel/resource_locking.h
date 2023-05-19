@@ -7,6 +7,6 @@ extern void modify_critical_region_counter(struct task*, int, char*, int);
 extern unsigned locks_held_count(struct task*);
 extern void modify_locks_held_count(struct task*, int);
 extern bool current_is_valid(void);
-extern inline void atomic_l_lockf(const char *lname, const char *file, int line);
-extern inline void atomic_l_unlockf();
+//extern static inline void atomic_l_lockf(wrlock_t *lock, const char *lname, const char *file, int line);
+//extern static inline void atomic_l_unlockf(wrlock_t *lock, const char *lname, const char *file, int line);
 

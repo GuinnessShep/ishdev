@@ -84,12 +84,15 @@ void unlock(lock_t *lock);
 void simple_lockt(lock_t *lock, int log_lock);
 int trylock(lock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line);
 void write_lock_destroy(wrlock_t *lock);
+static void atomic_l_lockf(wrlock_t *lock, const char *lname, const char *file, int line);
+static void atomic_l_unlockf(wrlock_t *lock, const char *lname, const char *file, int line);
 
 
 #if LOCK_DEBUG
 #define LOCK_INITIALIZER {PTHREAD_MUTEX_INITIALIZER, 0, { .initialized = true }}
 #else
-#define LOCK_INITIALIZER {PTHREAD_MUTEX_INITIALIZER, 0}
+#define LOCK_INITIALIZER {PTHREAD_MUTEX_INITIALIZER}
+
 #endif
 
 extern lock_t atomic_l_lock; // Used to make all lock operations atomic, even read->write and right->read -mke
@@ -103,28 +106,71 @@ void init_recursive_mutex(void) {
     pthread_mutex_init(&atomic_l_lock_m, &attr);
 }
 
-#define AL_DEBUG 1
+typedef struct {
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+    int is_locked;
+} pthread_mutex_timed_t;
 
-inline void atomic_l_lockf(const char *lname, const char *file, int line) {
-    if (!doEnableExtraLocking)
-        return;
-    if(AL_DEBUG) {
-        printk("alock :(%s) %s:%d\n", lname, file, line);
+int pthread_mutex_timedlock(pthread_mutex_timed_t *tmutex, const struct timespec *abstime) {
+    int ret;
+    if ((ret = pthread_mutex_lock(&tmutex->mutex)) != 0) {
+        return ret;
     }
 
-    int res = pthread_mutex_lock(&atomic_l_lock_m);
+    while (tmutex->is_locked) {
+        if ((ret = pthread_cond_timedwait(&tmutex->cond, &tmutex->mutex, abstime)) == ETIMEDOUT) {
+            pthread_mutex_unlock(&tmutex->mutex);
+            return ret;
+        }
+    }
+
+    tmutex->is_locked = 1;
+    pthread_mutex_unlock(&tmutex->mutex);
+    return 0;
+}
+
+void pthread_mutex_timedunlock(pthread_mutex_timed_t *tmutex) {
+    pthread_mutex_lock(&tmutex->mutex);
+    tmutex->is_locked = 0;
+    pthread_cond_signal(&tmutex->cond);
+    pthread_mutex_unlock(&tmutex->mutex);
+}
+
+#define AL_DEBUG 1
+
+static inline void atomic_l_lockf(wrlock_t *lock, const char *lname, const char *file, int line) {
+    if (!doEnableExtraLocking)
+        return;
+
+    if(AL_DEBUG) {
+        printf("alock :(%p) (%s) %s:%d\n", lock, lname, file, line);
+    }
+
+    struct timespec timeout;
+    clock_gettime(CLOCK_REALTIME, &timeout);
+    timeout.tv_sec += 5;
+    
+    int res = pthread_mutex_timedlock(&atomic_l_lock_m, &timeout);
     if (res != 0) {
-        // Handle error.
+        if (res == ETIMEDOUT) {
+            printf("alock : Timed out waiting for lock %p in %s:%d\n", lock, file, line);
+        } else {
+            // Other error
+            printf("alock : Error %d occurred while trying to acquire lock %p in %s:%d\n", res, lock, file, line);
+        }
     } else {
         safe_strncpy((char *)&atomic_l_lock.comm, current_comm(), 16);
         safe_strncpy((char *)&atomic_l_lock.lname, lname, 16);
         modify_locks_held_count_wrapper(1);
     }
 
+    pthread_mutex_unlock(&atomic_l_lock_m); // Always unlock the mutex after done using it
     modify_critical_region_counter_wrapper(1, file, line);
 }
 
-inline void atomic_l_unlockf(const char *lname, const char *file, int line) {
+
+static inline void atomic_l_unlockf(wrlock_t *lock, const char *lname, const char *file, int line) {
     if (!doEnableExtraLocking)
         return;
     
@@ -132,7 +178,7 @@ inline void atomic_l_unlockf(const char *lname, const char *file, int line) {
         printk("aUNlock :(%s)\n", atomic_l_lock.lname);
     }
 
-    printk("aUNlock :(%s) %s:%d\n", lname, file, line);
+    printk("aUNlock :(%d) (%s) %s:%d\n", lock, lname, file, line);
     int res = pthread_mutex_unlock(&atomic_l_lock_m);
     if (res != 0) {
         // Handle error.
