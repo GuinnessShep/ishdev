@@ -59,14 +59,20 @@ void decrement_reads_pending_count(wrlock_t *lock) {
 }
 
 void _write_unlock(wrlock_t *lock, const char *file, int line) {
+    if (lock->recursion.owner != pthread_self()) { // if the thread doesn't own the lock
+        printk("ERROR: Non owner thread/process trying to unlock internal write lock(%d)", lock);
+        return;
+    }
+    if (--lock->recursion.count > 0) { // if the lock was recursively acquired
+        return;
+    }
     atomic_fetch_add(&lock->val, 1);
-
     lock->line = 0;
     lock->pid = -1;
+    lock->recursion.owner = NULL; // reset the owner of the lock
     lock->comm[0] = 0;
     lock->file = NULL;
     modify_locks_held_count_wrapper(-1);
-    
     if(pthread_rwlock_unlock(&lock->l) != 0)
         printk("URGENT: write_unlock(%x:%d) error(PID: %d Process: %s) (%s:%d)\n", lock, atomic_load(&lock->val), current_pid(), current_comm(), file, line);
 }
@@ -78,11 +84,16 @@ void write_unlock(wrlock_t *lock, const char *file, int line) {
 }
 
 void _write_lock(wrlock_t *lock, const char *file, int line) {
+    if (lock->recursion.owner == pthread_self()) { // if the thread already owns the lock
+        lock->recursion.count++;
+        return;
+    }
     atomic_fetch_add(&lock->val, -1);
-
     lock->file = file;
     lock->line = line;
     lock->pid = current_pid();
+    lock->recursion.owner = pthread_self(); // set the current thread as the owner of the lock
+    lock->recursion.count = 1; // initialize lock count
     if (lock->pid > 9) {
         strncpy(lock->comm, current_comm(), 15);
         lock->comm[15] = '\0'; // Ensure null termination
@@ -92,11 +103,15 @@ void _write_lock(wrlock_t *lock, const char *file, int line) {
 void write_lock(wrlock_t *lock, const char *file, int line) {
     pthread_mutex_lock(&lock->m);
     while (atomic_load(&lock->val) > 0) {
-        pthread_cond_wait(&lock->cond, &lock->m);
+        pthread_mutex_unlock(&lock->m); // Release the lock to let other threads modify lock->val
+        pthread_cond_wait(&lock->cond, &lock->m); // Wait for the condition (lock->val to become 0)
+        pthread_mutex_lock(&lock->m); // Reacquire the lock
     }
+
     atomic_l_lockf(lock, "w_lock", __FILE_NAME__, __LINE__);
     _write_lock(lock, file, line);
     atomic_l_unlockf(lock, "w_lock", __FILE_NAME__, __LINE__);
+
     pthread_mutex_unlock(&lock->m);
 }
 
@@ -154,8 +169,8 @@ void wrlock_init(wrlock_t *lock) {
     if (pthread_rwlock_init(&lock->l, pattr)) __builtin_trap();
 #endif
     atomic_init(&lock->val, 0);
-    lock->line = lock->pid = 0;
-    //strcpy(lock->comm,NULL);
+    lock->line = lock->pid = lock->recursion.count = 0;
+    lock->recursion.owner = NULL;
     lock->file = NULL;
 }
 
@@ -183,13 +198,12 @@ void write_lock_destroy(wrlock_t *lock) {
 }
 
 static inline void _read_lock(wrlock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line) {
-    //lock_reads_pending_count(lock, 1);
     increment_reads_pending_count(lock);
     pthread_rwlock_rdlock(&lock->l);
     atomic_fetch_add(&lock->val, 1);
-    //unlock_reads_pending_count(lock);
     
     lock->pid = current_pid();
+    
     if(lock->pid > 9)
         strncpy((char *)lock->comm, current_comm(), 16);
     
@@ -240,29 +254,30 @@ void read_to_write_lock(wrlock_t *lock) {  // Try to atomically swap a RO lock t
 
 void write_to_read_lock(wrlock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line) { // Try to atomically swap a Write lock to a RO lock.  -mke
     critical_region_modify_wrapper(1, __FILE_NAME__, __LINE__);
+    
     atomic_l_lockf(lock, "wtr_lock\0", __FILE_NAME__, __LINE__);
     _write_unlock(lock, file, line);
     _read_lock(lock, file, line);
     atomic_l_unlockf(lock, "wtr_lock\0", __FILE_NAME__, __LINE__);
+    
     critical_region_modify_wrapper(-1, __FILE_NAME__, __LINE__);
 }
 
 void write_unlock_and_destroy(wrlock_t *lock) {
     critical_region_modify_wrapper(1, __FILE_NAME__, __LINE__);
-
+    
     atomic_l_lockf(lock, "wuad_lock\0", __FILE_NAME__, __LINE__);
     _write_unlock(lock, __FILE_NAME__, __LINE__);
     _write_lock_destroy(lock);
     atomic_l_unlockf(lock, "wuad_lock\0", __FILE_NAME__, __LINE__);
+    
     critical_region_modify_wrapper(-1, __FILE_NAME__, __LINE__);
 }
 
 void read_unlock_and_destroy(wrlock_t *lock) {
-    //critical_region_modify_wrapper(1, __FILE_NAME__, __LINE__);
     atomic_l_lockf(lock, "ruad_lock", __FILE_NAME__, __LINE__);
    // if(trylockw(lock)) // It should be locked, but just in case.  Likely masking underlying issue.  -mke
     //    _read_unlock(lock, __FILE_NAME__, __LINE__);
     _write_lock_destroy(lock);
     atomic_l_unlockf(lock, "ruad_lock", __FILE_NAME__, __LINE__);
-    //critical_region_modify_wrapper(-1, __FILE_NAME__, __LINE__);
 }

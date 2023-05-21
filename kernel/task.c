@@ -71,16 +71,16 @@ struct pid *pid_get_last_allocated() {
 }
 
 dword_t get_count_of_blocked_tasks() {
-    critical_region_modify(current, 1, __FILE__, __LINE__);
+    critical_region_modify(current, 1, __FILE_NAME__, __LINE__);
     dword_t res = 0;
     struct pid *pid_entry;
-    complex_lockt(&pids_lock, 0, __FILE__, __LINE__);
+    complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
     list_for_each_entry(&alive_pids_list, pid_entry, alive) {
         if (pid_entry->task->io_block) {
             res++;
         }
     }
-    critical_region_modify(current, -1, __FILE__, __LINE__);
+    critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
     unlock_pids(&pids_lock);
     return res;
 }
@@ -93,7 +93,7 @@ void zero_critical_regions_count(void) { // If doEnableExtraLocking is changed t
 }
 
 dword_t get_count_of_alive_tasks() {
-    complex_lockt(&pids_lock, 0, __FILE__, __LINE__);
+    complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
     dword_t res = 0;
     struct list *item;
     list_for_each(&alive_pids_list, item) {
@@ -104,7 +104,7 @@ dword_t get_count_of_alive_tasks() {
 }
 
 struct task *task_create_(struct task *parent) {
-    complex_lockt(&pids_lock, 0, __FILE__, __LINE__);
+    complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
     do {
         last_allocated_pid++;
         if (last_allocated_pid > MAX_PID) last_allocated_pid = 1;
@@ -244,7 +244,7 @@ void task_run_current() {
     tlb_refresh(&tlb, &current->mem->mmu);
     
     while (true) {
-        read_lock(&current->mem->lock, __FILE__, __LINE__);
+        read_lock(&current->mem->lock, __FILE_NAME__, __LINE__);
         
         if(!doEnableMulticore) {
             safe_mutex_lock(&multicore_lock);
@@ -252,7 +252,7 @@ void task_run_current() {
         
         int interrupt = cpu_run_to_interrupt(cpu, &tlb);
         
-        read_unlock(&current->mem->lock, __FILE__, __LINE__);
+        read_unlock(&current->mem->lock, __FILE_NAME__, __LINE__);
         
         if(!doEnableMulticore)
             pthread_mutex_unlock(&multicore_lock);

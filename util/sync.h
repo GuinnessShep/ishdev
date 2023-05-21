@@ -44,6 +44,10 @@ typedef struct {
         pthread_mutex_t lock;
         atomic_int count; // Use atomic int for reads_pending
     } reads_pending;
+    struct {
+        pthread_t owner; // Keep track of the owner of the lock, currently only used on write locks -mke
+        int count; // If the same thread tries to lock/unlock , increment or decrement until 0 and carry on. -mke
+    } recursion;
     const char *file;
     int line;
     int pid;
