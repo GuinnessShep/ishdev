@@ -63,7 +63,7 @@ void complex_lockt(lock_t *lock, int log_lock, __attribute__((unused)) const cha
     }
     
     modify_locks_held_count_wrapper(1);
-    //modify_critical_region_counter_wrapper(-1,__FILE_NAME__, __LINE__);
+    //critical_region_modify_wrapper(-1,__FILE_NAME__, __LINE__);
     
     if(count > count_max * .90) {
         if(!log_lock)
@@ -86,14 +86,14 @@ void complex_lockt(lock_t *lock, int log_lock, __attribute__((unused)) const cha
 
 void simple_lockt(lock_t *lock, int log_lock) {
     if(!log_lock) {
-        modify_critical_region_counter_wrapper(1,__FILE_NAME__, __LINE__);
+        critical_region_modify_wrapper(1,__FILE_NAME__, __LINE__);
         pthread_mutex_lock(&lock->m);
         modify_locks_held_count_wrapper(1);
         lock->owner = pthread_self();
         lock->pid = current_pid();
         lock->uid = current_uid();
         strncpy(lock->comm, current_comm(), 16);
-        modify_critical_region_counter_wrapper(-1, __FILE_NAME__, __LINE__);
+        critical_region_modify_wrapper(-1, __FILE_NAME__, __LINE__);
     } else {
         pthread_mutex_lock(&lock->m);
         lock->owner = pthread_self();
@@ -113,14 +113,14 @@ void unlock_pids(lock_t *lock) {
 }
 
 void unlock(lock_t *lock) {
-    //modify_critical_region_counter_wrapper(1, __FILE_NAME__, __LINE__);
+    //critical_region_modify_wrapper(1, __FILE_NAME__, __LINE__);
     
     lock->owner = zero_init(pthread_t);
     pthread_mutex_unlock(&lock->m);
     lock->pid = -1; //
     lock->comm[0] = 0;
     modify_locks_held_count_wrapper(-1);
-    //modify_critical_region_counter_wrapper(-1, __FILE_NAME__, __LINE__);
+    //critical_region_modify_wrapper(-1, __FILE_NAME__, __LINE__);
     
 #if LOCK_DEBUG
     assert(lock->debug.initialized);

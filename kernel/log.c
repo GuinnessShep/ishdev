@@ -122,11 +122,11 @@ static int do_syslog(int type, addr_t buf_addr, int_t len) {
     }
 }
 int_t sys_syslog(int_t type, addr_t buf_addr, int_t len) {
-    ////modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
+    ////critical_region_modify(current, 1, __FILE_NAME__, __LINE__);
     simple_lockt(&log_lock, 0);
     int retval = do_syslog(type, buf_addr, len);
     unlock(&log_lock);
-    ////modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
+    ////critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
     return retval;
 }
 
@@ -219,9 +219,9 @@ void die(const char *msg, ...) {
 
 // fun little utility function
 int current_pid(void) {
-    modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
+    critical_region_modify(current, 1, __FILE_NAME__, __LINE__);
     if(current != NULL) {
-        modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
+        critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
         if ((current->exiting == false) || (current != NULL)) {
             return current->pid;
         } else {
@@ -229,23 +229,23 @@ int current_pid(void) {
         }
     }
     
-    modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
+    critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
     return -1;
 }
 
 int current_uid(void) {
-    modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
+    critical_region_modify(current, 1, __FILE_NAME__, __LINE__);
     if(current != NULL) {
         if ((current->exiting == false) || (current != NULL)) {
-            modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
+            critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
             return current->uid;
         } else {
-            modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
+            critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
             return -1;
         }
     }
     
-    modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
+    critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
     return -1;
 }
 

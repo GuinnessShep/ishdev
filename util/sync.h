@@ -19,7 +19,7 @@ extern int current_pid(void);
 extern int current_uid(void);
 extern char* current_comm(void);
 extern unsigned critical_region_count_wrapper(void);
-extern void modify_critical_region_counter_wrapper(int, const char*, int);
+extern void critical_region_modify_wrapper(int, const char*, int);
 extern unsigned locks_held_count_wrapper(void);
 extern void modify_locks_held_count_wrapper(int);
 extern struct pid *pid_get(dword_t id);
@@ -40,8 +40,10 @@ typedef struct {
     // -1: write-locked
     // >0: read-locked with this many readers
     atomic_int val;
-    pthread_rwlock_t read_pending_lock;
-    atomic_int reads_pending; // Use atomic int for reads_pending
+    struct {
+        pthread_mutex_t lock;
+        atomic_int count; // Use atomic int for reads_pending
+    } reads_pending;
     const char *file;
     int line;
     int pid;
@@ -98,21 +100,28 @@ static void atomic_l_unlockf(wrlock_t *lock, const char *lname, const char *file
 extern lock_t atomic_l_lock; // Used to make all lock operations atomic, even read->write and right->read -mke
 
 pthread_mutexattr_t attr;
-pthread_mutex_t atomic_l_lock_m;
 
-void init_recursive_mutex(void) {
-    pthread_mutexattr_init(&attr);
-    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-    pthread_mutex_init(&atomic_l_lock_m, &attr);
-}
+#include <stdio.h>
+#include <pthread.h>
+#include <time.h>
 
 typedef struct {
     pthread_mutex_t mutex;
     pthread_cond_t cond;
     int is_locked;
-} pthread_mutex_timed_t;
+} my_pthread_mutex_timed_t;
 
-int pthread_mutex_timedlock(pthread_mutex_timed_t *tmutex, const struct timespec *abstime) {
+my_pthread_mutex_timed_t atomic_l_lock_m;
+
+void init_recursive_mutex(void) {
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&atomic_l_lock_m.mutex, &attr);
+    pthread_cond_init(&atomic_l_lock_m.cond, NULL);
+}
+
+int my_pthread_mutex_timedlock(my_pthread_mutex_timed_t *tmutex, const struct timespec *abstime) {
     int ret;
     if ((ret = pthread_mutex_lock(&tmutex->mutex)) != 0) {
         return ret;
@@ -130,63 +139,69 @@ int pthread_mutex_timedlock(pthread_mutex_timed_t *tmutex, const struct timespec
     return 0;
 }
 
-void pthread_mutex_timedunlock(pthread_mutex_timed_t *tmutex) {
-    pthread_mutex_lock(&tmutex->mutex);
+int my_pthread_mutex_timedunlock(my_pthread_mutex_timed_t *tmutex) {
+    int res = pthread_mutex_lock(&tmutex->mutex);
+    if (res != 0)
+        return res;
     tmutex->is_locked = 0;
     pthread_cond_signal(&tmutex->cond);
-    pthread_mutex_unlock(&tmutex->mutex);
+    res = pthread_mutex_unlock(&tmutex->mutex);
+    return res;
 }
 
-#define AL_DEBUG 1
+#define AL_DEBUG 0
 
 static inline void atomic_l_lockf(wrlock_t *lock, const char *lname, const char *file, int line) {
     if (!doEnableExtraLocking)
         return;
 
-    if(AL_DEBUG) {
-        printf("alock :(%p) (%s) %s:%d\n", lock, lname, file, line);
-    }
-
     struct timespec timeout;
     clock_gettime(CLOCK_REALTIME, &timeout);
     timeout.tv_sec += 5;
+
+    int res = my_pthread_mutex_timedlock(&atomic_l_lock_m, &timeout);
+
+    if (AL_DEBUG) {
+        int lval = atomic_load(&lock->val);
+        printf("alock :(%p:%d) (%s) %s:%d\n", lock, lval, lname, file, line);
+    }
     
-    int res = pthread_mutex_timedlock(&atomic_l_lock_m, &timeout);
     if (res != 0) {
         if (res == ETIMEDOUT) {
-            printf("alock : Timed out waiting for lock %p in %s:%d\n", lock, file, line);
+            printk("ERROR: atomic_l_lockf: Timed out waiting for lock %p in %s:%d\n", lock, file, line);
         } else {
-            // Other error
-            printf("alock : Error %d occurred while trying to acquire lock %p in %s:%d\n", res, lock, file, line);
+            printk("ERROR: atomic_l_lockf Error code %d occurred while trying to acquire lock %p in %s:%d\n", res, lock, file, line);
         }
     } else {
-        safe_strncpy((char *)&atomic_l_lock.comm, current_comm(), 16);
-        safe_strncpy((char *)&atomic_l_lock.lname, lname, 16);
+        safe_strncpy((char *)&lock->comm, current_comm(), 16);
+        safe_strncpy((char *)&lock->lname, lname, 16);
         modify_locks_held_count_wrapper(1);
     }
 
-    pthread_mutex_unlock(&atomic_l_lock_m); // Always unlock the mutex after done using it
-    modify_critical_region_counter_wrapper(1, file, line);
+    my_pthread_mutex_timedunlock(&atomic_l_lock_m); // Always unlock the mutex after done using it
+    critical_region_modify_wrapper(1, file, line);
 }
-
 
 static inline void atomic_l_unlockf(wrlock_t *lock, const char *lname, const char *file, int line) {
     if (!doEnableExtraLocking)
         return;
-    
-    if(AL_DEBUG) {
-        printk("aUNlock :(%s)\n", atomic_l_lock.lname);
-    }
 
-    printk("aUNlock :(%d) (%s) %s:%d\n", lock, lname, file, line);
-    int res = pthread_mutex_unlock(&atomic_l_lock_m);
+    int res = my_pthread_mutex_timedunlock(&atomic_l_lock_m);
+
+    if (AL_DEBUG) {
+        int lval = atomic_load(&lock->val);
+        printf("aUNlock :(%p:%d) (%s) %s:%d (%d)\n", lock, lval, lname, file, line, current_pid());
+    }
+    
     if (res != 0) {
         // Handle error.
+        printf("aUNlock : Error %d occurred while trying to unlock %p in %s:%d (%d)\n", res, lock, file, line, current_pid());
     }
 
     modify_locks_held_count_wrapper(-1);
-    modify_critical_region_counter_wrapper(-1, "atomic_l_unlockf\0", 314);
+    critical_region_modify_wrapper(-1, "atomic_l_unlockf\0", 314);
 }
+
 
 typedef struct {
     pthread_cond_t cond;

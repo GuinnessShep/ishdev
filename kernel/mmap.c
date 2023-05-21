@@ -106,11 +106,11 @@ static addr_t mmap_common(addr_t addr, dword_t len, dword_t prot, dword_t flags,
     if ((flags & MMAP_PRIVATE) && (flags & MMAP_SHARED))
         return _EINVAL;
 
-    //modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
+    //critical_region_modify(current, 1, __FILE_NAME__, __LINE__);
     write_lock(&current->mem->lock, __FILE_NAME__, __LINE__);
     addr_t res = do_mmap(addr, len, prot, flags, fd_no, offset);
     write_unlock(&current->mem->lock, __FILE_NAME__, __LINE__);
-    //modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
+    //critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
     return res;
 }
 
@@ -156,11 +156,11 @@ int_t sys_munmap(addr_t addr, uint_t len) {
     if (len == 0)
         return _EINVAL;
     
-    //modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
+    //critical_region_modify(current, 1, __FILE_NAME__, __LINE__);
     write_lock(&current->mem->lock, __FILE_NAME__, __LINE__);
     int err = pt_unmap_always(current->mem, PAGE(addr), PAGE_ROUND_UP(len));
     write_unlock(&current->mem->lock, __FILE_NAME__, __LINE__);
-    //modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
+    //critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
     
     if (err < 0)
         return _EINVAL;

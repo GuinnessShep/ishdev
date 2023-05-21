@@ -123,7 +123,7 @@ noreturn void do_exit(int status) {
     unlock(&current->group->lock);
 
     // the actual freeing needs pids_lock
-    modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
+    critical_region_modify(current, 1, __FILE_NAME__, __LINE__);
     complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
     // release the sighand
     signal_pending = !!(current->pending & ~current->blocked);
@@ -188,7 +188,7 @@ noreturn void do_exit(int status) {
             exit_hook(current, status);
     }
 
-    modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
+    critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
     vfork_notify(current);
     if(current != leader) 
         task_destroy(current);
@@ -222,7 +222,7 @@ noreturn void do_exit_group(int status) {
     //while((critical_region_count(current))) { // Wait for now, task is in one or more critical sections, and/or has locks
      //   nanosleep(&lock_pause, NULL);
    // }
-    modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
+    critical_region_modify(current, 1, __FILE_NAME__, __LINE__);
     list_for_each_entry(&group->threads, task, group_links) {
         task->exiting = true;
         deliver_signal(task, SIGKILL_, SIGINFO_NIL);
@@ -232,7 +232,7 @@ noreturn void do_exit_group(int status) {
     }
 
     unlock_pids(&pids_lock);
-    modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
+    critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
     unlock(&group->lock);
     if(current->pid <= MAX_PID) // abort if crazy.  -mke
         do_exit(status);
@@ -427,7 +427,7 @@ int do_wait(int idtype, pid_t_ id, struct siginfo_ *info, struct rusage_ *rusage
         return _EINVAL;
 
     complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
-    modify_critical_region_counter(current, 1, __FILE_NAME__, __LINE__);
+    critical_region_modify(current, 1, __FILE_NAME__, __LINE__);
     int err;
     bool got_signal = false;
 
@@ -487,12 +487,12 @@ retry:
 
     info->sig = SIGCHLD_;
 found_something:
-    modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
+    critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
     unlock_pids(&pids_lock);
     return 0;
 
 error:
-    modify_critical_region_counter(current, -1, __FILE_NAME__, __LINE__);
+    critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
     unlock_pids(&pids_lock);
     return err;
 }
