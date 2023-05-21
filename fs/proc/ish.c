@@ -16,6 +16,7 @@
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <netinet/in.h>
+#include "debug.h"
 
 const char *proc_ish_version = "";
 char **(*get_all_defaults_keys)(void);
@@ -173,9 +174,10 @@ char *get_ip_str(const struct sockaddr *sa, char *s, size_t maxlen) {
     return s;
 }
 
-char *parse_if_flags(int flags) {
+void parse_if_flags(int flags, char *build_string, size_t size) {
     int first = 1;  // No comma on the first flag
-    char *build_string = malloc(200);
+    memset(build_string, 0, size);  // Ensure the string is initialized to zero
+
     if(flags & IFF_UP) {
         first = 0;
         strcat(build_string, "UP");
@@ -260,69 +262,54 @@ char *parse_if_flags(int flags) {
         first = 0;
         strcat(build_string, "MULTICAST");
     }
-    
-    return build_string;
-               
 }
 
 static int proc_ish_show_ips(struct proc_entry *UNUSED(entry), struct proc_data *buf) {
-    //proc_printf(buf, "Iface        IP                                         Family    Flags   Broadcast    Mask        \n");
-    proc_printf(buf, "Iface        IP                                         Broedcast/Multicast                         Family    Flags\n");
+    proc_printf(buf, "Iface        IP                                         Broadcast/Multicast                         Family    Flags\n");
     struct ifaddrs *addrs;
-    bool success = (getifaddrs(&addrs) == 0);
-    if (success) {
-        const struct ifaddrs *cursor = addrs;
-        char * type = malloc(9);
-        while (cursor != NULL) {
-            if ((cursor->ifa_addr->sa_family == AF_INET) || (cursor->ifa_addr->sa_family == AF_INET6)) {
-                char * int_ip = malloc(100);
-                char * int_dstaddr = malloc(100);
-                if(cursor->ifa_addr->sa_family == AF_INET) {
-                    strncpy(type, "IF_INET", 9);
-                } else {
-                    strncpy(type, "IF_INET6", 9);
-                }
-                //cursor->ifa_addr->sa_family = AF_INET;
-                get_ip_str(cursor->ifa_addr, int_ip, 100);
-                if(cursor->ifa_dstaddr != NULL) {
-                    if(cursor->ifa_dstaddr->sa_family == AF_INET) {
-                        strncpy(type, "IF_INET", 9);
-                    } else {
-                        strncpy(type, "IF_INET6", 9);
-                        cursor->ifa_dstaddr->sa_family = AF_INET6;
-                    }
-                    get_ip_str(cursor->ifa_dstaddr, int_dstaddr, 100);
-                } else {
-                    strcpy(int_dstaddr," ");
-                }
-                char * int_flags = malloc(250);
-                int_flags = parse_if_flags(cursor->ifa_flags);
-                /*proc_printf(buf, "%-10.10s   %-40s   %-8s  %-x     %-40s     %8.8d\n",
-                            cursor->ifa_name,
-                            int_ip,
-                            type,
-                            cursor->ifa_flags,
-                            int_dstaddr,
-                            cursor->ifa_netmask
-                            ); */
-                proc_printf(buf, "%-10.10s   %-40s   %-40s    %-8s  %-60s\n",
-                            cursor->ifa_name,
-                            int_ip,
-                            int_dstaddr,
-                            type,
-                            int_flags
-                );
-                free(int_ip);
-                free(int_dstaddr);
-                free(int_flags);
-            }
-            cursor = cursor->ifa_next;
-        }
-        freeifaddrs(addrs);
-        free(type);
+    int ret = getifaddrs(&addrs);
+    if (ret != 0) {
+        printk("ERROR: Failed to get network interfaces, error: %s\n", strerror(errno));
+        return ret;
     }
+
+    const struct ifaddrs *cursor = addrs;
+    char type[9];
+    char int_ip[100];
+    char int_dstaddr[100];
+    char int_flags[250];
+
+    while (cursor != NULL) {
+        if ((cursor->ifa_addr->sa_family == AF_INET) || (cursor->ifa_addr->sa_family == AF_INET6)) {
+            if(cursor->ifa_addr->sa_family == AF_INET) {
+                strncpy(type, "IF_INET", 8);
+                type[8] = '\0';
+            } else {
+                strncpy(type, "IF_INET6", 8);
+                type[8] = '\0';
+            }
+            get_ip_str(cursor->ifa_addr, int_ip, 100);
+            if(cursor->ifa_dstaddr != NULL) {
+                get_ip_str(cursor->ifa_dstaddr, int_dstaddr, 100);
+            } else {
+                strcpy(int_dstaddr," ");
+            }
+            parse_if_flags(cursor->ifa_flags, int_flags, sizeof(int_flags));
+            proc_printf(buf, "%-10.10s   %-40s   %-40s    %-8s  %-60s\n",
+                        cursor->ifa_name,
+                        int_ip,
+                        int_dstaddr,
+                        type,
+                        int_flags
+            );
+        }
+        cursor = cursor->ifa_next;
+    }
+
+    freeifaddrs(addrs);
     return 0;
 }
+
 
 static int proc_ish_show_version(struct proc_entry *UNUSED(entry), struct proc_data *buf) {
     proc_printf(buf, "%s\n", proc_ish_version);

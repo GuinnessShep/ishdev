@@ -91,37 +91,48 @@ static int proc_show_route(struct proc_entry *UNUSED(entry), struct proc_data *b
     proc_printf(buf, "Iface    Destination    Gateway     Flags    RefCnt    Use    Metric    Mask        MTU    Window    IRTT \n");
     
     struct ifaddrs *addrs;
-    bool success = (getifaddrs(&addrs) == 0);
-    if (success) {
-        const struct ifaddrs *cursor = addrs;
-        while (cursor != NULL) {
-            int anything_but_loopback = strcmp(cursor->ifa_name, "lo0");
-            if ((cursor->ifa_addr->sa_family == AF_LINK) && (anything_but_loopback)) {
-                const struct if_data *stats = (struct if_data *)cursor->ifa_data;
-                proc_printf(buf, "%-6.6s   %8.8d       %8.8x    %+4.4x     %1.1d         %3.3d    %8.8d  %8.8d    %1.1d   %1.1d         %1.1d\n",
-                            cursor->ifa_name,
-                            (unsigned long)0, // Destination
-                            (unsigned long)0, // Gateway IP
-                            cursor->ifa_flags,
-                            (unsigned long)0, //RefCnt
-                            (unsigned long)0, // Use
-                            (unsigned long)stats->ifi_metric,
-                            cursor->ifa_netmask,
-                            (unsigned long)stats->ifi_mtu,
-                            (unsigned long)0, // Window
-                            (unsigned long)0  // IRTT
-                            );
-            }
-            cursor = cursor->ifa_next;
-        }
-        freeifaddrs(addrs);
+    int ret = getifaddrs(&addrs);
+    if (ret != 0) {
+        printk("ERROR: Failed to get network interfaces, error: %s\n", strerror(ret));
+        return ret;
     }
-    //proc_printf(buf, "eth0    00000000    0124A8C0    0003    0    0    202    00000000    0    0    0\n");
-    //proc_printf(buf, "wlan0    00000000    0101A8C0    0003    0    0    303    00000000    0    0    0\n");
-    //proc_printf(buf, "wlan0    0001A8C0    00000000    0001    0    0    303    00FFFFFF    0    0    0\n");
-    //proc_printf(buf, "eth0    0024A8C0    00000000    0001    0    0    202    00FFFFFF    0    0    0\n");
+
+    struct ifaddrs *cursor = addrs;
+    while (cursor != NULL) {
+        if (cursor->ifa_addr == NULL) {
+            cursor = cursor->ifa_next;
+            continue;
+        }
+
+        int anything_but_loopback = strcmp(cursor->ifa_name, "lo0");
+        if ((cursor->ifa_addr->sa_family == AF_LINK) && (anything_but_loopback)) {
+            struct if_data *stats = (struct if_data *)cursor->ifa_data;
+            if (stats == NULL) {
+                cursor = cursor->ifa_next;
+                continue;
+            }
+
+            proc_printf(buf, "%-6.6s  %8.8d   %8.8d  %+4.4x  %1.1d  %3.3d  %8.8d  %8.8d  %1.1d  %1.1d  %1.1d\n",
+                        cursor->ifa_name,
+                        0, // Destination
+                        0, // Gateway IP
+                        cursor->ifa_flags,
+                        0, // RefCnt
+                        0, // Use
+                        (unsigned long)stats->ifi_metric,
+                        0, // Mask
+                        (unsigned long)stats->ifi_mtu,
+                        0, // Window
+                        0  // IRTT
+            );
+        }
+        cursor = cursor->ifa_next;
+    }
+    freeifaddrs(addrs);
+
     return 0;
 }
+
 
 static int proc_show_dev(struct proc_entry * UNUSED(entry), struct proc_data *buf) {
     proc_printf(buf, "Inter-|   Receive                            "
@@ -131,67 +142,65 @@ static int proc_show_dev(struct proc_entry * UNUSED(entry), struct proc_data *bu
                  "drop fifo colls carrier compressed\n");
 
     struct ifaddrs *addrs;
-    bool success = (getifaddrs(&addrs) == 0);
-    if (success) {
-        const struct ifaddrs *cursor = addrs;
-        while (cursor != NULL) {
-            if (cursor->ifa_addr->sa_family == AF_LINK) {
-              /*
-               Inter-|   Receive                                                |  Transmit
-                 face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
-                    lo:    4214      37    0    0    0     0          0         0     4214      37    0    0    0     0       0          0
-                  eth0:  410911    6589    0    0    0     0          0       116   264679    4078    0    0    0     0       0          0
-                 wlan0: 3014178    3267    0    0    0     0          0         2   126045    1205    0    0    0     0       0          0
-               */
-                const struct if_data *stats = (struct if_data *)cursor->ifa_data;
-                
-                if (stats != NULL) {
-                    proc_printf(buf, "%6s:%8lu %7lu %4lu %4lu %4lu %5lu %10lu %9lu %8lu %7lu %4lu %4lu %4lu %5lu %7lu %10lu\n",
-                                 cursor->ifa_name,
-                                 (unsigned long)stats->ifi_ibytes,   // stats->rx_bytes,
-                                 (unsigned long)stats->ifi_ipackets,   // stats->rx_packets,
-                                 (unsigned long)stats->ifi_ierrors,  // stats->rx_errors,
-                                 (unsigned long)stats->ifi_iqdrops,  // stats->rx_dropped + stats->rx_missed_errors,
-                                 (unsigned long)0,  // stats->rx_fifo_errors,
-                                 (unsigned long)0,  // stats->rx_length_errors + stats->rx_over_errors +
-                                 (unsigned long)0,  // stats->rx_crc_errors + stats->rx_frame_errors,
-                                 (unsigned long)0,  // stats->rx_compressed,
-                                 (unsigned long)stats->ifi_imcasts,  // stats->multicast,
-                                 (unsigned long)stats->ifi_obytes,  // stats->tx_bytes,
-                                 (unsigned long)stats->ifi_opackets,  // stats->tx_packets,
-                                 (unsigned long)stats->ifi_oerrors,  // stats->tx_errors,
-                                 (unsigned long)0,  // stats->tx_dropped,
-                                 (unsigned long)0,  // stats->tx_fifo_errors,
-                                 (unsigned long)stats->ifi_collisions,  // stats->collisions,
-                                 (unsigned long)stats->ifi_ierrors + stats->ifi_oerrors,  // stats->tx_carrier_errors + stats->tx_aborted_errors +
-                                 (unsigned long)0,  // stats->tx_window_errors + stats->tx_heartbeat_errors,
-                                 (unsigned long)0
-                                );  // stats->tx_compressed);
-                } else {
-                    proc_printf(buf, "%6.6s:%8lu %7lu %4lu %4lu %4lu %5lu %10lu %9lu %8lu %7lu %4lu %4lu %4lu %5lu %7lu %10lu\n",
-                                 cursor->ifa_name,
-                                 (unsigned long long)0,
-                                 (unsigned long long)0,
-                                 (unsigned long long)0,
-                                 (unsigned long long)0,
-                                 (unsigned long long)0,
-                                 (unsigned long long)0,
-                                 (unsigned long long)0,
-                                 (unsigned long long)0,
-                                 (unsigned long long)0,
-                                 (unsigned long long)0,
-                                 (unsigned long long)0,
-                                 (unsigned long long)0,
-                                 (unsigned long long)0,
-                                 (unsigned long long)0,
-                                 (unsigned long long)0,
-                                 (unsigned long long)0);
-                }
-            }
-            cursor = cursor->ifa_next;
-        }
-        freeifaddrs(addrs);
+    int ret = getifaddrs(&addrs);
+    if (ret != 0) {
+        printk("ERROR: Failed to get network interfaces, error: %s\n", strerror(ret));
+        return ret;
     }
+
+    struct ifaddrs *cursor = addrs;
+    while (cursor != NULL) {
+        if (cursor->ifa_addr == NULL) {
+            cursor = cursor->ifa_next;
+            continue;
+        }
+
+        if (cursor->ifa_addr->sa_family == AF_LINK) {
+            struct if_data *stats = (struct if_data *)cursor->ifa_data;
+            if (stats != NULL) {
+                proc_printf(buf, "%6s:%8llu %7llu %4llu %4llu %4llu %5llu %10llu %9llu %8llu %7llu %4llu %4llu %4llu %5llu %7llu %10llu\n",
+                            cursor->ifa_name,
+                            (unsigned long long)stats->ifi_ibytes,
+                            (unsigned long long)stats->ifi_ipackets,
+                            (unsigned long long)stats->ifi_ierrors,
+                            (unsigned long long)stats->ifi_iqdrops,
+                            (unsigned long long)0,
+                            (unsigned long long)0,
+                            (unsigned long long)0,
+                            (unsigned long long)0,
+                            (unsigned long long)stats->ifi_imcasts,
+                            (unsigned long long)stats->ifi_obytes,
+                            (unsigned long long)stats->ifi_opackets,
+                            (unsigned long long)stats->ifi_oerrors,
+                            (unsigned long long)0,
+                            (unsigned long long)0,
+                            (unsigned long long)stats->ifi_collisions,
+                            (unsigned long long)(stats->ifi_ierrors + stats->ifi_oerrors),
+                            (unsigned long long)0);
+            } else {
+                proc_printf(buf, "%6s:%8llu %7llu %4llu %4llu %4llu %5llu %10llu %9llu %8llu %7llu %4llu %4llu %4llu %5llu %7llu %10llu\n",
+                            cursor->ifa_name,
+                            (unsigned long long)0,
+                            (unsigned long long)0,
+                            (unsigned long long)0,
+                            (unsigned long long)0,
+                            (unsigned long long)0,
+                            (unsigned long long)0,
+                            (unsigned long long)0,
+                            (unsigned long long)0,
+                            (unsigned long long)0,
+                            (unsigned long long)0,
+                            (unsigned long long)0,
+                            (unsigned long long)0,
+                            (unsigned long long)0,
+                            (unsigned long long)0,
+                            (unsigned long long)0,
+                            (unsigned long long)0);
+            }
+        }
+        cursor = cursor->ifa_next;
+    }
+    freeifaddrs(addrs);
 
     return 0;
 }

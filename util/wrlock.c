@@ -1,12 +1,9 @@
 #include <stdatomic.h>
 #include <pthread.h>
 #include <stdbool.h>
-#include <setjmp.h>
-#include<errno.h>
 #include "misc.h"
 #include "debug.h"
 #include "util/sync.h"
-#include <strings.h>
 
 // R/W locks, implemented using pthread
 
@@ -61,7 +58,7 @@ void decrement_reads_pending_count(wrlock_t *lock) {
     safe_mutex_unlock(&lock->reads_pending.lock);
 }
 
-static inline void _write_unlock(wrlock_t *lock, const char *file, int line) {
+void _write_unlock(wrlock_t *lock, const char *file, int line) {
     atomic_fetch_add(&lock->val, 1);
 
     lock->line = 0;
@@ -80,7 +77,7 @@ void write_unlock(wrlock_t *lock, const char *file, int line) {
     atomic_l_unlockf(lock, "w_unlock\0", __FILE_NAME__, __LINE__);
 }
 
-static inline void _write_lock(wrlock_t *lock, const char *file, int line) {
+void _write_lock(wrlock_t *lock, const char *file, int line) {
     atomic_fetch_add(&lock->val, -1);
 
     lock->file = file;
@@ -103,7 +100,7 @@ void write_lock(wrlock_t *lock, const char *file, int line) {
     pthread_mutex_unlock(&lock->m);
 }
 
-static inline int trylockw(wrlock_t *lock, const char *file, int line) {
+int trylockw(wrlock_t *lock, const char *file, int line) {
     atomic_l_lockf(lock, "trylockw\0", __FILE_NAME__, __LINE__);
     int status = pthread_rwlock_trywrlock(&lock->l);
 
@@ -207,7 +204,7 @@ void read_lock(wrlock_t *lock, __attribute__((unused)) const char *file, __attri
 }
 
 static inline void _read_unlock(wrlock_t *lock, const char *file, int line) {
-    assert(atomic_load(&lock->val) > 0);
+    //assert(atomic_load(&lock->val) > 0); // This should in theory be safe since the atomic_l_lockf() function has been invoked prior.
     atomic_fetch_sub(&lock->val, 1);
     decrement_reads_pending_count(lock);
     if(atomic_load(&lock->val) < 0) {

@@ -110,7 +110,7 @@ static int proc_show_stat(struct proc_entry *UNUSED(entry), struct proc_data *bu
     struct cpu_usage total_usage = get_total_cpu_usage();
     struct cpu_usage* per_cpu_usage = 0;
     struct uptime_info uptime_info = get_uptime();
-    unsigned uptime = uptime_info.uptime_ticks;
+    uint64_t uptime = uptime_info.uptime_ticks;
     
     proc_printf(buf, "cpu  %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" 0 0 0 0\n", total_usage.user_ticks, total_usage.nice_ticks, total_usage.system_ticks, total_usage.idle_ticks);
     
