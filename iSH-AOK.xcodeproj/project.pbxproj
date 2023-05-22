@@ -203,6 +203,7 @@
 		BBC3863F276817AD00CC8C2E /* CurrentRoot.m in Sources */ = {isa = PBXBuildFile; fileRef = BB565EA32734F1FB00C93EAE /* CurrentRoot.m */; };
 		BBD23D5F258DA450003DCB40 /* Screenshots.m in Sources */ = {isa = PBXBuildFile; fileRef = BBD23D5E258DA450003DCB40 /* Screenshots.m */; };
 		BBD23D77258DA4BC003DCB40 /* SnapshotHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBD23D76258DA4BC003DCB40 /* SnapshotHelper.swift */; };
+		BBE64AC22A198FCC00589372 /* ExceptionExfiltrator.m in Sources */ = {isa = PBXBuildFile; fileRef = 49FF844A2A06249F00850B7A /* ExceptionExfiltrator.m */; };
 		BBECF3AD269132F400DEC937 /* LinuxInterop.c in Sources */ = {isa = PBXBuildFile; fileRef = BBECF39D2691313B00DEC937 /* LinuxInterop.c */; };
 		BBECF3AE2691330F00DEC937 /* libiSH-AOKLinux.a in Frameworks */ = {isa = PBXBuildFile; fileRef = BBECF3A22691314C00DEC937 /* libiSH-AOKLinux.a */; };
 		BBECF3B9269136FB00DEC937 /* liblinux.a in Frameworks */ = {isa = PBXBuildFile; fileRef = BBECF3B8269136E100DEC937 /* liblinux.a */; };
@@ -2145,6 +2146,7 @@
 				BBBFE94921C5CFF100509DD5 /* NSError+ISHErrno.m in Sources */,
 				BB9C7B87240A2B1E00F5D4F0 /* AppGroup.m in Sources */,
 				BB88F4942154760800A341FD /* FileProviderExtension.m in Sources */,
+				BBE64AC22A198FCC00589372 /* ExceptionExfiltrator.m in Sources */,
 				BB88F4972154760800A341FD /* FileProviderItem.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2526,6 +2528,7 @@
 				CURRENT_PROJECT_VERSION = 492;
 				DEAD_CODE_STRIPPING = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				CURRENT_PROJECT_VERSION = 494;
 			};
 			name = "Debug-ApplePleaseFixFB19282108";
 		};
@@ -2533,10 +2536,10 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = BB0B85A52586F1E100208600 /* ProjectRelease.xcconfig */;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 492;
 				DEAD_CODE_STRIPPING = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				CURRENT_PROJECT_VERSION = 494;
 			};
 			name = Release;
 		};
@@ -2595,9 +2598,9 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = BB28C7532689522C00BDC834 /* ProjectDebugLinux.xcconfig */;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 492;
 				DEAD_CODE_STRIPPING = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				CURRENT_PROJECT_VERSION = 494;
 			};
 			name = DebugLinux;
 		};
@@ -2923,10 +2926,10 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = BB28C7522689522700BDC834 /* ProjectReleaseLinux.xcconfig */;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 492;
 				DEAD_CODE_STRIPPING = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				CURRENT_PROJECT_VERSION = 494;
 			};
 			name = ReleaseLinux;
 		};
