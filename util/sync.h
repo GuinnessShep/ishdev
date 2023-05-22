@@ -78,15 +78,15 @@ void write_unlock_and_destroy(wrlock_t *lock);
 typedef struct {
     pthread_mutex_t m;
     pthread_t owner;
-    //const char *comm;
     int pid;
     int uid;
     char comm[16];
-    char lname[16];  // The name of the lock.  -mke
-    bool wait4; // Is this lock in use by wait4
+    char lname[16];
+    bool wait4;
+
 #if LOCK_DEBUG
     struct lock_debug {
-        const char *file; // doubles as locked
+        const char *file;
         int line;
         int pid;
         bool initialized;
@@ -96,7 +96,7 @@ typedef struct {
 
 int lock_init(lock_t *lock, const char *lname);
 void complex_lockt(lock_t *lock, int log_lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line);
-void unlock_pids(lock_t *lock);
+void unlock(lock_t *lock);
 void unlock(lock_t *lock);
 void simple_lockt(lock_t *lock, int log_lock);
 int trylock(lock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line);

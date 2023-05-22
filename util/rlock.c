@@ -15,28 +15,34 @@
 #include <errno.h>
 
 int lock_init(lock_t *lock, const char *lname) {
-    if (pthread_mutex_init(&lock->m, NULL) != 0) {
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+
+    if (pthread_mutex_init(&lock->m, &attr) != 0) {
         return errno;
     }
 
     if(lname != NULL) {
-        strncpy(lock->lname, lname, 15); // copy at most 15 characters
-        lock->lname[15] = '\0'; // ensure null-termination
+        strncpy(lock->lname, lname, 15);
+        lock->lname[15] = '\0';
     } else {
-        strncpy(lock->lname, "WTF", 15); // copy at most 15 characters
-        lock->lname[15] = '\0'; // ensure null-termination
+        strncpy(lock->lname, "WTF", 15);
+        lock->lname[15] = '\0';
     }
 
     lock->wait4 = false;
+
 #if LOCK_DEBUG
     lock->debug = (struct lock_debug) {
         .initialized = true,
     };
 #endif
+
     lock->comm[0] = 0;
     lock->uid = -1;
 
-    return 0; // success
+    return 0;
 }
 
 #define MAX_COMM_LENGTH 16
@@ -87,42 +93,41 @@ void complex_lockt(lock_t *lock, int log_lock, const char *file, int line) {
 
 
 void simple_lockt(lock_t *lock, int log_lock) {
-    if(!log_lock) {
-        critical_region_modify_wrapper(1,__FILE_NAME__, __LINE__);
-        pthread_mutex_lock(&lock->m);
-        modify_locks_held_count_wrapper(1);
-        lock->owner = pthread_self();
-        lock->pid = current_pid();
-        lock->uid = current_uid();
-        strncpy(lock->comm, current_comm(), 16);
-        critical_region_modify_wrapper(-1, __FILE_NAME__, __LINE__);
-    } else {
-        pthread_mutex_lock(&lock->m);
-        lock->owner = pthread_self();
-        lock->pid = current_pid();
-        lock->uid = current_uid();
-        strncpy(lock->comm, current_comm(), 16);
+    pthread_mutex_lock(&lock->m);
+    
+    if (pthread_self() != lock->owner) {
+        if(!log_lock) {
+            critical_region_modify_wrapper(1,__FILE_NAME__, __LINE__);
+            modify_locks_held_count_wrapper(1);
+            lock->owner = pthread_self();
+            lock->pid = current_pid();
+            lock->uid = current_uid();
+            strncpy(lock->comm, current_comm(), 16);
+            critical_region_modify_wrapper(-1, __FILE_NAME__, __LINE__);
+        } else {
+            lock->owner = pthread_self();
+            lock->pid = current_pid();
+            lock->uid = current_uid();
+            strncpy(lock->comm, current_comm(), 16);
+        }
     }
+        
     return;
 }
 
-void unlock_pids(lock_t *lock) {
-    lock->owner = zero_init(pthread_t);
-    pthread_mutex_unlock(&lock->m);
-    lock->pid = -1; //
-    lock->comm[0] = 0;
-    //modify_locks_held_count_wrapper(-1);
-}
-
 void unlock(lock_t *lock) {
-    //critical_region_modify_wrapper(1, __FILE_NAME__, __LINE__);
     
-    lock->owner = zero_init(pthread_t);
+    if (pthread_self() == lock->owner) {
+        lock->owner = zero_init(pthread_t);
+        pthread_mutex_unlock(&lock->m);
+        lock->pid = -1; //
+        lock->comm[0] = 0;
+        modify_locks_held_count_wrapper(-1);
+    } else {
+        // It is an error, handle
+    }
+    
     pthread_mutex_unlock(&lock->m);
-    lock->pid = -1; //
-    lock->comm[0] = 0;
-    modify_locks_held_count_wrapper(-1);
-    //critical_region_modify_wrapper(-1, __FILE_NAME__, __LINE__);
     
 #if LOCK_DEBUG
     assert(lock->debug.initialized);
@@ -143,11 +148,11 @@ int trylock(lock_t *lock, __attribute__((unused)) const char *file, __attribute_
     }
 #endif
     if((!status) && (current_pid() > 10)) {// iSH-AOK crashes if low number processes are not excluded.  Might be able to go lower then 10?  -mke
-        modify_locks_held_count_wrapper(1);
-        
-        //STRACE("trylock(%x, %s(%d), %s, %d\n", lock, lock->comm, lock->pid, file, line);
-        lock->pid = current_pid();
-        strncpy(lock->comm, current_comm(), 16);
+        if (pthread_self() != lock->owner) {
+            modify_locks_held_count_wrapper(1);
+            lock->pid = current_pid();
+            strncpy(lock->comm, current_comm(), 16);
+        }
     }
     return status;
 }

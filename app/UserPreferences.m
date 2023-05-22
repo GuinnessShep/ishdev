@@ -44,7 +44,7 @@ NSDictionary<NSString *, NSString *> *kvoProperties;
 extern bool doEnableMulticore;
 extern unsigned doLockSleepNanoseconds;
 extern void complex_lockt(lock_t *lock, int log_lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line);
-extern void unlock_pids(lock_t *lock) ;
+extern void unlock(lock_t *lock) ;
 
 static NSString *const kSystemMonospacedFontName = @"ui-monospace";
 
@@ -461,7 +461,7 @@ bool (*remove_user_default)(const char *name);
     if(doEnableExtraLocking == true) {  // This needs to be the opposite of what you would expect because of reasons.  -mke
         complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
         zero_critical_regions_count();
-        unlock_pids(&pids_lock);
+        unlock(&pids_lock);
     }
     return [*value isKindOfClass:NSNumber.class];
 }

@@ -81,7 +81,7 @@ dword_t get_count_of_blocked_tasks() {
         }
     }
     critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
-    unlock_pids(&pids_lock);
+    unlock(&pids_lock);
     return res;
 }
 
@@ -99,7 +99,7 @@ dword_t get_count_of_alive_tasks() {
     list_for_each(&alive_pids_list, item) {
         res++;
     }
-    unlock_pids(&pids_lock);
+    unlock(&pids_lock);
     return res;
 }
 
@@ -117,7 +117,7 @@ struct task *task_create_(struct task *parent) {
 
     struct task *task = malloc(sizeof(struct task));
     if (task == NULL) {
-        unlock_pids(&pids_lock);
+        unlock(&pids_lock);
         return NULL;
     }
     *task = (struct task) {};
@@ -134,7 +134,7 @@ struct task *task_create_(struct task *parent) {
         task->parent = parent;
         list_add(&parent->children, &task->siblings);
     }
-    unlock_pids(&pids_lock);
+    unlock(&pids_lock);
 
     task->pending = 0;
     list_init(&task->queue);
@@ -211,7 +211,7 @@ void task_destroy(struct task *task) {
     }
     
     if(Ishould)
-        unlock_pids(&pids_lock);
+        unlock(&pids_lock);
     
     free(task);
 }

@@ -141,7 +141,7 @@ noreturn void do_exit(int status) {
         list_remove(&sigqueue->queue);
         free(sigqueue);
     }
-    //unlock_pids(&pids_lock);
+    //unlock(&pids_lock);
     struct task *leader = current->group->leader;
 
     // reparent children
@@ -193,7 +193,7 @@ noreturn void do_exit(int status) {
     if(current != leader) 
         task_destroy(current);
     
-    unlock_pids(&pids_lock);
+    unlock(&pids_lock);
     //atomic_l_unlockf();
 
     pthread_exit(NULL);
@@ -231,7 +231,7 @@ noreturn void do_exit_group(int status) {
         notify(&task->group->stopped_cond);
     }
 
-    unlock_pids(&pids_lock);
+    unlock(&pids_lock);
     critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
     unlock(&group->lock);
     if(current->pid <= MAX_PID) // abort if crazy.  -mke
@@ -374,7 +374,7 @@ static bool reap_if_zombie(struct task *task, struct siginfo_ *info_out, struct 
     // &pids_lock is locked already at this point
     //complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
     task_destroy(task);
-    //unlock_pids(&pids_lock);
+    //unlock(&pids_lock);
     
     return true;
 }
@@ -488,12 +488,12 @@ retry:
     info->sig = SIGCHLD_;
 found_something:
     critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
-    unlock_pids(&pids_lock);
+    unlock(&pids_lock);
     return 0;
 
 error:
     critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
-    unlock_pids(&pids_lock);
+    unlock(&pids_lock);
     return err;
 }
 

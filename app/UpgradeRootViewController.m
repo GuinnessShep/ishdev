@@ -28,7 +28,7 @@ extern void complex_lockt(lock_t *lock, int log_lock, __attribute__((unused)) co
 
 @implementation UpgradeRootViewController
 
-extern void unlock_pids(lock_t *lock);
+extern void unlock(lock_t *lock);
 
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -37,7 +37,7 @@ extern void unlock_pids(lock_t *lock);
 
     complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
     current = pid_get_task(1); // pray
-    unlock_pids(&pids_lock);
+    unlock(&pids_lock);
     self.terminal = [Terminal createPseudoTerminal:&self->_tty];
     current = NULL;
     
@@ -81,7 +81,7 @@ extern void unlock_pids(lock_t *lock);
     } else {
         complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
         current = pid_get_task(1); // pray
-        unlock_pids(&pids_lock);
+        unlock(&pids_lock);
         FsUpdateRepositories();
         current = NULL;
         [self showAlertWithTitle:@"Upgrade succeeded" message:@""];
