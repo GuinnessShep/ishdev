@@ -9,8 +9,6 @@
 
 #define LOCK_DEBUG 0
 
-void safe_strncpy(char *dest, const char *src, size_t dest_size);
-
 // A safer string copy function that guarantees null-termination.
 void safe_strncpy(char *dest, const char *src, size_t dest_size) {
     strncpy(dest, src, dest_size - 1);
@@ -59,17 +57,17 @@ void decrement_reads_pending_count(wrlock_t *lock) {
 }
 
 void _write_unlock(wrlock_t *lock, const char *file, int line) {
-    if (lock->recursion.owner != pthread_self()) { // if the thread doesn't own the lock
+    if (lock->write_recursion.owner != pthread_self()) { // if the thread doesn't own the lock
         printk("ERROR: Non owner thread/process trying to unlock internal write lock(%d)", lock);
         return;
     }
-    if (--lock->recursion.count > 0) { // if the lock was recursively acquired
+    if (--lock->write_recursion.count > 0) { // if the lock was recursively acquired
         return;
     }
     atomic_fetch_add(&lock->val, 1);
     lock->line = 0;
     lock->pid = -1;
-    lock->recursion.owner = NULL; // reset the owner of the lock
+    lock->write_recursion.owner = NULL; // reset the owner of the lock
     lock->comm[0] = 0;
     lock->file = NULL;
     modify_locks_held_count_wrapper(-1);
@@ -84,16 +82,16 @@ void write_unlock(wrlock_t *lock, const char *file, int line) {
 }
 
 void _write_lock(wrlock_t *lock, const char *file, int line) {
-    if (lock->recursion.owner == pthread_self()) { // if the thread already owns the lock
-        lock->recursion.count++;
+    if (lock->write_recursion.owner == pthread_self()) { // if the thread already owns the lock
+        lock->write_recursion.count++;
         return;
     }
     atomic_fetch_add(&lock->val, -1);
     lock->file = file;
     lock->line = line;
     lock->pid = current_pid();
-    lock->recursion.owner = pthread_self(); // set the current thread as the owner of the lock
-    lock->recursion.count = 1; // initialize lock count
+    lock->write_recursion.owner = pthread_self(); // set the current thread as the owner of the lock
+    lock->write_recursion.count = 1; // initialize lock count
     if (lock->pid > 9) {
         strncpy(lock->comm, current_comm(), 15);
         lock->comm[15] = '\0'; // Ensure null termination
@@ -164,14 +162,22 @@ void wrlock_init(wrlock_t *lock) {
         printk("URGENT: wrlock_init() 'm' error(PID: %d Process: %s)\n",current_pid(), current_comm());
     if (pthread_mutex_init(&lock->reads_pending.lock, NULL))
         printk("URGENT: wrlock_init() 'reads_pending_lock error(PID: %d Process: %s)\n",current_pid(), current_comm());
+    
     atomic_init(&lock->reads_pending.count, 0);
+    
+    pthread_mutex_init(&lock->read_recursion.lock, NULL);
+    lock->read_recursion.lock_infos = NULL;
+    lock->read_recursion.lock_infos_count = 0;
+    
 #else
     if (pthread_rwlock_init(&lock->l, pattr)) __builtin_trap();
 #endif
     atomic_init(&lock->val, 0);
-    lock->line = lock->pid = lock->recursion.count = 0;
-    lock->recursion.owner = NULL;
+    lock->line = lock->pid = lock->write_recursion.count = 0;
+    lock->write_recursion.owner = NULL;
     lock->file = NULL;
+    
+    free(pattr);
 }
 
 static inline void _write_lock_destroy(wrlock_t *lock) {
@@ -197,18 +203,49 @@ void write_lock_destroy(wrlock_t *lock) {
     atomic_l_unlockf(lock, "l_destroy\0", __FILE_NAME__, __LINE__);
 }
 
-static inline void _read_lock(wrlock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line) {
-    increment_reads_pending_count(lock);
-    pthread_rwlock_rdlock(&lock->l);
+void _read_lock(wrlock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line) {
+    pthread_t self = pthread_self();  // Get the ID of the current thread.
+
+    pthread_mutex_lock(&lock->read_recursion.lock);  // Lock the mutex for read lock tracking.
+
+    // Iterate over all existing locks.
+    for (size_t i = 0; i < lock->read_recursion.lock_infos_count; ++i) {
+        // If the current thread already holds a read lock.
+        if (pthread_equal(lock->read_recursion.lock_infos[i].thread_id, self)) {
+            lock->read_recursion.lock_infos[i].lock_count++;  // Increment lock count for the thread.
+            pthread_mutex_unlock(&lock->read_recursion.lock);  // Unlock the mutex for read lock tracking.
+            return;  // Return, as the same thread is trying to acquire the lock.
+        }
+    }
+
+    pthread_mutex_unlock(&lock->read_recursion.lock);  // Unlock the mutex for read lock tracking.
+
+    pthread_mutex_lock(&lock->reads_pending.lock);  // Lock the mutex for reads pending.
+    lock->reads_pending.count++;  // Increment the number of readers waiting for the lock.
+    pthread_mutex_unlock(&lock->reads_pending.lock);  // Unlock the mutex for reads pending.
+
+    // Ensure that a write lock isn't being held or pending.
+    while (lock->write_recursion.owner != NULL) {
+        nanosleep(&lock_pause, NULL);  // If write lock is held or pending, wait before retrying.
+    }
+
+    pthread_rwlock_rdlock(&lock->l);  // Actual read lock acquisition.
     atomic_fetch_add(&lock->val, 1);
-    
-    lock->pid = current_pid();
-    
-    if(lock->pid > 9)
-        strncpy((char *)lock->comm, current_comm(), 16);
-    
-    return;
-    
+
+    pthread_mutex_lock(&lock->reads_pending.lock);  // Lock the mutex for reads pending.
+    lock->reads_pending.count--;  // Decrement the number of readers waiting for the lock.
+    pthread_mutex_unlock(&lock->reads_pending.lock);  // Unlock the mutex for reads pending.
+
+    // Adding a new lock info for the current thread.
+    pthread_mutex_lock(&lock->read_recursion.lock);  // Lock the mutex for read lock tracking.
+
+    // The thread does not have a read lock yet, so add one.
+    lock->read_recursion.lock_infos_count++;
+    lock->read_recursion.lock_infos = realloc(lock->read_recursion.lock_infos, lock->read_recursion.lock_infos_count * sizeof(read_lock_info_t));
+    lock->read_recursion.lock_infos[lock->read_recursion.lock_infos_count - 1].thread_id = self;
+    lock->read_recursion.lock_infos[lock->read_recursion.lock_infos_count - 1].lock_count = 1;
+
+    pthread_mutex_unlock(&lock->read_recursion.lock);  // Unlock the mutex for read lock tracking.
 }
 
 void read_lock(wrlock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line) { // Wrapper so that external calls lock, internal calls using _read_unlock() don't -mke
@@ -217,28 +254,34 @@ void read_lock(wrlock_t *lock, __attribute__((unused)) const char *file, __attri
     atomic_l_unlockf(lock, "r_lock\0", __FILE_NAME__, __LINE__);
 }
 
-static inline void _read_unlock(wrlock_t *lock, const char *file, int line) {
-    //assert(atomic_load(&lock->val) > 0); // This should in theory be safe since the atomic_l_lockf() function has been invoked prior.
-    atomic_fetch_sub(&lock->val, 1);
-    decrement_reads_pending_count(lock);
-    if(atomic_load(&lock->val) < 0) {
-        printk("ERROR: read_unlock(%x) error(PID: %d Process: %s count %d) (%s:%d)\n",lock, current_pid(), current_comm(), atomic_load(&lock->val), file, line);
-        lock->pid = -1;
-        lock->comm[0] = 0;
-        modify_locks_held_count_wrapper(-1);
-        pthread_rwlock_unlock(&lock->l);
-        return;
+void _read_unlock(wrlock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line) {
+    pthread_t self = pthread_self();  // Get the ID of the current thread.
+
+    pthread_mutex_lock(&lock->read_recursion.lock);  // Lock the mutex for read lock tracking.
+
+    // Find the lock info for the current thread and decrement the lock count.
+    for (size_t i = 0; i < lock->read_recursion.lock_infos_count; ++i) {
+        if (pthread_equal(lock->read_recursion.lock_infos[i].thread_id, self)) {
+            lock->read_recursion.lock_infos[i].lock_count--;
+            if (lock->read_recursion.lock_infos[i].lock_count == 0) {
+                // If the lock count has reached 0, remove the lock info.
+                memmove(&lock->read_recursion.lock_infos[i], &lock->read_recursion.lock_infos[i + 1], (lock->read_recursion.lock_infos_count - i - 1) * sizeof(read_lock_info_t));
+                lock->read_recursion.lock_infos_count--;
+                lock->read_recursion.lock_infos = realloc(lock->read_recursion.lock_infos, lock->read_recursion.lock_infos_count * sizeof(read_lock_info_t));
+            }
+            break;
+        }
     }
-    pthread_rwlock_unlock(&lock->l);
-    modify_locks_held_count_wrapper(-1);
+
+    pthread_mutex_unlock(&lock->read_recursion.lock);  // Unlock the mutex for read lock tracking.
+
+    pthread_rwlock_unlock(&lock->l);  // Actual read lock release.
+    atomic_fetch_sub(&lock->val, 1);
 }
 
 void read_unlock(wrlock_t *lock, const char *file, int line) {
     atomic_l_lockf(lock, "r_unlock\0", __FILE_NAME__, __LINE__);
     _read_unlock(lock, file, line);
-    pthread_mutex_lock(&lock->m);
-    pthread_cond_signal(&lock->cond);
-    pthread_mutex_unlock(&lock->m);
     atomic_l_unlockf(lock, "r_unlock\0", __FILE_NAME__, __LINE__);
 }
 

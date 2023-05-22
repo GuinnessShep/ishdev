@@ -39,50 +39,52 @@ int lock_init(lock_t *lock, const char *lname) {
     return 0; // success
 }
 
-void complex_lockt(lock_t *lock, int log_lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line) {
-    // "Advanced" locking for some things.  pids_lock for instance
-    //if(lock->pid == current_pid())
-     //   return; //  Stupid?  Minimizes deadlocks, but... -mke
+#define MAX_COMM_LENGTH 16
+#define INITIAL_BACKOFF 1000
+#define MAX_BACKOFF 100000
+#define MAX_ATTEMPTS 500
+
+void complex_lockt(lock_t *lock, int log_lock, const char *file, int line) {
     unsigned int count = 0;
-    int random_wait = WAIT_SLEEP + rand() % WAIT_SLEEP;
-    struct timespec lock_pause = {0 /*secs*/, random_wait /*nanosecs*/};
-    long count_max = (WAIT_MAX_UPPER - random_wait);  // As sleep time increases, decrease acceptable loops.  -mke
+    unsigned int backoff = INITIAL_BACKOFF;
+    const unsigned int max_backoff = MAX_BACKOFF;
+    struct timespec lock_pause;
     
-    while((pthread_mutex_trylock(&lock->m))) {
-        count++;
-        nanosleep(&lock_pause, NULL);
-        if(count > count_max) {
-            if(!log_lock) {
+    while(pthread_mutex_trylock(&lock->m)) {
+        if (count > MAX_ATTEMPTS) {
+            if (!log_lock) {
                 printk("ERROR: Possible deadlock(complex_lockt(%x), aborted lock attempt(PID: %d Process: %s) (Previously Owned:%s:%d) (Called By:%s:%d)\n", lock->m, current_pid(), current_comm(), lock->comm, lock->pid, file, line);
                 pthread_mutex_unlock(&lock->m);
                 modify_locks_held_count_wrapper(-1);
             }
             return;
         }
-        // Loop until lock works.  Maybe this will help make the multithreading work? -mke
+        
+        lock_pause.tv_sec = 0;
+        lock_pause.tv_nsec = backoff;
+        nanosleep(&lock_pause, NULL);
+
+        backoff = backoff * 2 > max_backoff ? max_backoff : backoff * 2;
+        ++count;
     }
     
     modify_locks_held_count_wrapper(1);
-    //critical_region_modify_wrapper(-1,__FILE_NAME__, __LINE__);
-    
-    if(count > count_max * .90) {
-        if(!log_lock)
-           printk("Warning: large lock attempt count (%d)(complex_lockt(%x), aborted lock attempt(PID: %d Process: %s) (Previously Owned:%s:%d) (Called By:%s:%d)\n", count, lock->m, current_pid(), current_comm(), lock->comm, lock->pid, file, line);
-    }
 
     lock->owner = pthread_self();
     lock->pid = current_pid();
     lock->uid = current_uid();
-    strncpy(lock->comm, current_comm(), 16);
+    strncpy(lock->comm, current_comm(), MAX_COMM_LENGTH);
+    lock->comm[MAX_COMM_LENGTH - 1] = '\0'; // ensure null termination
+
 #if LOCK_DEBUG
     assert(lock->debug.initialized);
     assert(!lock->debug.file && "Attempting to recursively lock");
     lock->debug.file = file;
     lock->debug.line = line;
-    extern int current_pid(void);
     lock->debug.pid = current_pid();
 #endif
 }
+
 
 void simple_lockt(lock_t *lock, int log_lock) {
     if(!log_lock) {

@@ -33,6 +33,11 @@ extern bool doEnableExtraLocking;
 extern struct timespec lock_pause;
 
 typedef struct {
+    pthread_t thread_id;
+    uint32_t lock_count;
+} read_lock_info_t;
+
+typedef struct {
     pthread_mutex_t m;
     pthread_cond_t cond;
     pthread_rwlock_t l;
@@ -47,7 +52,13 @@ typedef struct {
     struct {
         pthread_t owner; // Keep track of the owner of the lock, currently only used on write locks -mke
         int count; // If the same thread tries to lock/unlock , increment or decrement until 0 and carry on. -mke
-    } recursion;
+    } write_recursion;
+    // New field for tracking read locks.
+    struct {
+        pthread_mutex_t lock;  // Protects the lock_infos list.
+        read_lock_info_t *lock_infos;  // A dynamically-allocated array.
+        size_t lock_infos_count;  // The number of elements in lock_infos.
+    } read_recursion;
     const char *file;
     int line;
     int pid;
@@ -90,8 +101,8 @@ void unlock(lock_t *lock);
 void simple_lockt(lock_t *lock, int log_lock);
 int trylock(lock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line);
 void write_lock_destroy(wrlock_t *lock);
-static void atomic_l_lockf(wrlock_t *lock, const char *lname, const char *file, int line);
-static void atomic_l_unlockf(wrlock_t *lock, const char *lname, const char *file, int line);
+static inline void atomic_l_lockf(wrlock_t *lock, const char *lname, const char *file, int line);
+static inline void atomic_l_unlockf(wrlock_t *lock, const char *lname, const char *file, int line);
 
 
 #if LOCK_DEBUG
@@ -183,10 +194,23 @@ static inline void atomic_l_lockf(wrlock_t *lock, const char *lname, const char 
     }
 
     my_pthread_mutex_timedunlock(&atomic_l_lock_m); // Always unlock the mutex after done using it
-    critical_region_modify_wrapper(1, file, line);
+}
+    
+static inline void atomic_l_unlockf(wrlock_t *lock, const char *lname, const char *file, int line) {
+    if (!doEnableExtraLocking)
+        return;
+    
+    int rc = pthread_mutex_unlock(&lock->m);
+    if (rc) {
+        // handle the error. As an example, we'll just print the error and exit
+        printk("ERROR: Failed to unlock mutex: %s\n", strerror(rc));
+        exit(EXIT_FAILURE);
+    } else {
+        modify_locks_held_count_wrapper(-1);
+    }
 }
 
-static inline void atomic_l_unlockf(wrlock_t *lock, const char *lname, const char *file, int line) {
+/* static inline void atomic_l_unlockf(wrlock_t *lock, const char *lname, const char *file, int line) {
     if (!doEnableExtraLocking)
         return;
 
@@ -205,7 +229,7 @@ static inline void atomic_l_unlockf(wrlock_t *lock, const char *lname, const cha
     modify_locks_held_count_wrapper(-1);
     critical_region_modify_wrapper(-1, "atomic_l_unlockf\0", 314);
 }
-
+*/
 
 typedef struct {
     pthread_cond_t cond;

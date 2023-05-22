@@ -36,15 +36,7 @@ static int __user_write_task(struct task *task, addr_t addr, const void *buf, si
         if (ptr == NULL)
             return 1;
         memcpy(ptr, &cbuf[p - addr], chunk_end - p);
-     /*   if(!strcmp(task->comm, "ls")) {  // Turns out this code mostly deals with linked libraries, at least in the case of ls.  -mke
-            char foo[500] = {};
-            memcpy(foo, &cbuf[p - addr], 50);
-            int a = 0;
-            printk("INFO: FOO: %s\n", foo);
-            memcpy(ptr, &cbuf[p - addr], chunk_end - p);
-        } else {
-            memcpy(ptr, &cbuf[p - addr], chunk_end - p);
-        } */
+        
         p = chunk_end;
     }
     return 0;
