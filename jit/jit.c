@@ -225,7 +225,6 @@ static int cpu_step_to_interrupt(struct cpu_state *cpu, struct tlb *tlb) {
         addr_t ip = frame->cpu.eip;
         size_t cache_index = jit_cache_hash(ip);
         struct jit_block *block = cache[cache_index];
-        //////critical_region_modify(current, 1, __FILE_NAME__, __LINE__);
         if (block == NULL || block->addr != ip) {
             simple_lockt(&jit->lock, 0);
             block = jit_lookup(jit, ip);
@@ -238,7 +237,6 @@ static int cpu_step_to_interrupt(struct cpu_state *cpu, struct tlb *tlb) {
             cache[cache_index] = block;
             unlock(&jit->lock);
         }
-        //////critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
         struct jit_block *last_block = frame->last_block;
         if (last_block != NULL &&
                 (last_block->jump_ip[0] != NULL ||
@@ -251,9 +249,7 @@ static int cpu_step_to_interrupt(struct cpu_state *cpu, struct tlb *tlb) {
                     if (last_block->jump_ip[i] != NULL &&
                             (*last_block->jump_ip[i] & 0xffffffff) == block->addr) {
                         *last_block->jump_ip[i] = (unsigned long) block->code;
-			//critical_region_modify(current, 1, __FILE_NAME__, __LINE__);
                         list_add(&block->jumps_from[i], &last_block->jumps_from_links[i]);
-			//critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
                     }
                 }
             }

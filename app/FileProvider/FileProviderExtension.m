@@ -10,7 +10,7 @@
 #import "FileProviderEnumerator.h"
 #import "NSError+ISHErrno.h"
 #import "../AppGroup.h"
-#import "../ExceptionExfiltrator.h"
+//#import "../ExceptionExfiltrator.h"
 #include "fs/fake-db.h"
 
 @interface FileProviderExtension () {
@@ -442,9 +442,9 @@
                                            error:nil];
 }
 
-+ (void)load {
-    NSSetUncaughtExceptionHandler(iSHExceptionHandler);
-}
+//+ (void)load {
+//    NSSetUncaughtExceptionHandler(iSHExceptionHandler);
+//} // This doesn't work in iSH-AOK for some reason.  -mke
 
 @end
 

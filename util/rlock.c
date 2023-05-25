@@ -41,6 +41,7 @@ int lock_init(lock_t *lock, const char *lname) {
 
     lock->comm[0] = 0;
     lock->uid = -1;
+    lock->pid = -1;
 
     return 0;
 }
@@ -123,8 +124,10 @@ void unlock(lock_t *lock) {
         lock->pid = -1; //
         lock->comm[0] = 0;
         modify_locks_held_count_wrapper(-1);
-    } else {
+    } else if(lock->pid > 0) {
         // It is an error, handle
+        //printk("ERROR: Lock %d (%d:%s) attempted unlock by non locking owner (%d: %s)\n", lock, lock->pid, lock->comm, current_comm(), current_pid());
+        printk("ERROR: Lock %d (%d:%s) attempted unlock by non locking owner\n", lock, lock->pid, lock->comm);
     }
     
     pthread_mutex_unlock(&lock->m);

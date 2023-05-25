@@ -205,6 +205,12 @@ void write_lock_destroy(wrlock_t *lock) {
 
 void _read_lock(wrlock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line) {
     pthread_t self = pthread_self();  // Get the ID of the current thread.
+    
+    if(lock->pid == 0) {
+        // Init is starting, things are not sane.  -mke
+        return;
+    }
+        
 
     pthread_mutex_lock(&lock->read_recursion.lock);  // Lock the mutex for read lock tracking.
 
@@ -256,6 +262,11 @@ void read_lock(wrlock_t *lock, __attribute__((unused)) const char *file, __attri
 
 void _read_unlock(wrlock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line) {
     pthread_t self = pthread_self();  // Get the ID of the current thread.
+    
+    if(lock->pid == 0) {
+        // This is the bootstrap for init, things are not sane so abort.  -mke
+        return;
+    }
 
     pthread_mutex_lock(&lock->read_recursion.lock);  // Lock the mutex for read lock tracking.
 

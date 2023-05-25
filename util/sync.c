@@ -123,15 +123,18 @@ int wait_for(cond_t *cond, lock_t *lock, struct timespec *timeout) {
 }
 
 int wait_for_ignore_signals(cond_t *cond, lock_t *lock, struct timespec *timeout) {
+    simple_lockt(&current->general_lock, 0);
     if (current) {
         simple_lockt(&current->waiting_cond_lock, 0);
         current->waiting_cond = cond;
         current->waiting_lock = lock;
         unlock(&current->waiting_cond_lock);
     }
+    unlock(&current->general_lock);
     int rc = 0;
     char saveme[16];
     strncpy(saveme, lock->lname, 16); // Save for later
+
 #if LOCK_DEBUG
     struct lock_debug lock_tmp = lock->debug;
     lock->debug = (struct lock_debug) { .initialized = lock->debug.initialized };
@@ -177,12 +180,15 @@ int wait_for_ignore_signals(cond_t *cond, lock_t *lock, struct timespec *timeout
     lock->debug = lock_tmp;
 #endif
 
+    simple_lockt(&current->general_lock, 0);
     if(current) {
         simple_lockt(&current->waiting_cond_lock, 0);
         current->waiting_cond = NULL;
         current->waiting_lock = NULL;
         unlock(&current->waiting_cond_lock);
     }
+    unlock(&current->general_lock);
+
     lock->wait4 = false;
     if(rc == ETIMEDOUT)
         return _ETIMEDOUT;

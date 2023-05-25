@@ -9,7 +9,6 @@
 #include "emu/tlb.h"
 #include "platform/platform.h"
 #include "util/sync.h"
-#include <pthread.h>
 #include <libkern/OSAtomic.h>
 #include <os/proc.h>
 
@@ -63,14 +62,14 @@ struct task *pid_get_task(dword_t id) {
     return task;
 }
 
-struct pid *pid_get_last_allocated() {
+struct pid *pid_get_last_allocated(void) {
     if (!last_allocated_pid) {
         return NULL;
     }
     return pid_get(last_allocated_pid);
 }
 
-dword_t get_count_of_blocked_tasks() {
+dword_t get_count_of_blocked_tasks(void) {
     critical_region_modify(current, 1, __FILE_NAME__, __LINE__);
     dword_t res = 0;
     struct pid *pid_entry;
@@ -92,7 +91,7 @@ void zero_critical_regions_count(void) { // If doEnableExtraLocking is changed t
     }
 }
 
-dword_t get_count_of_alive_tasks() {
+dword_t get_count_of_alive_tasks(void) {
     complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
     dword_t res = 0;
     struct list *item;
@@ -103,28 +102,53 @@ dword_t get_count_of_alive_tasks() {
     return res;
 }
 
-struct task *task_create_(struct task *parent) {
+static struct pid *allocate_pid(void) {
     complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
     do {
         last_allocated_pid++;
         if (last_allocated_pid > MAX_PID) last_allocated_pid = 1;
     } while (!pid_empty(&pids[last_allocated_pid]));
+
     struct pid *pid = &pids[last_allocated_pid];
     pid->id = last_allocated_pid;
     list_init(&pid->alive);
     list_init(&pid->session);
     list_init(&pid->pgroup);
+    unlock(&pids_lock);
+    return pid;
+}
+
+static void wait_for_task_exit_conditions(struct task *task) {
+    bool signal_pending = !!(current->pending & ~current->blocked);
+    int count = -4000;
+
+    while (((critical_region_count(task) > 1) || (locks_held_count(task)) || (signal_pending)) && (count < 0)) {
+        nanosleep(&lock_pause, NULL);
+        signal_pending = !!(current->blocked);
+        count++;
+    }
+}
+
+void set_task_pid(struct task *task, int pid) {
+    complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
+    task->pid = pid;
+    unlock(&pids_lock);
+}
+
+struct task *task_create_(struct task *parent) {
+    struct pid *pid = allocate_pid();
+    if (pid == NULL) {
+        return NULL;
+    }
 
     struct task *task = malloc(sizeof(struct task));
     if (task == NULL) {
-        unlock(&pids_lock);
         return NULL;
     }
-    *task = (struct task) {};
-    if (parent != NULL)
-        *task = *parent;
 
-    task->pid = pid->id;
+    *task = (parent != NULL) ? *parent : (struct task) {};
+    set_task_pid(task, pid->id);
+    
     pid->task = task;
     list_add(&alive_pids_list, &pid->alive);
 
@@ -134,7 +158,6 @@ struct task *task_create_(struct task *parent) {
         task->parent = parent;
         list_add(&parent->children, &task->siblings);
     }
-    unlock(&pids_lock);
 
     task->pending = 0;
     list_init(&task->queue);
@@ -154,8 +177,8 @@ struct task *task_create_(struct task *parent) {
     lock_init(&task->ptrace.lock, "task_creat_ptr\0");
     cond_init(&task->ptrace.cond);
     
-    task->locks_held.count = 0; // counter used to keep track of pending locks associated with task.  Do not delete when locks are present.  -mke
-    task->critical_region.count = 0; // counter used to delay task deletion if positive.  --mke
+    task->locks_held.count = 0;
+    task->critical_region.count = 0;
     pthread_mutex_init(&task->critical_region.lock, NULL);
     pthread_mutex_init(&task->locks_held.lock, NULL);
     
@@ -164,65 +187,34 @@ struct task *task_create_(struct task *parent) {
 
 void task_destroy(struct task *task) {
     task->exiting = true;
-    
-    bool signal_pending = !!(current->pending & ~current->blocked);
-    int count = -4000; // Maybe this is more efficient? -mke
-    while(((critical_region_count(task) > 1) || (locks_held_count(task)) || (signal_pending)) && (count < 1)) { // Wait for now, task is in one or more critical sections, and/or has locks
-        nanosleep(&lock_pause, NULL);
-        signal_pending = !!(current->blocked);
-        count++;
+
+    wait_for_task_exit_conditions(task);
+
+    if (!trylock(&pids_lock, __FILE_NAME__, __LINE__)) {
+        wait_for_task_exit_conditions(task);
+        list_remove(&task->siblings);
+
+        struct pid *pid = pid_get(task->pid);
+        pid->task = NULL;
+
+        wait_for_task_exit_conditions(task);
+        list_remove(&pid->alive);
+
+        wait_for_task_exit_conditions(task);
+        unlock(&pids_lock);
     }
 
-    bool Ishould = false;
-    if(!trylock(&pids_lock, __FILE_NAME__, __LINE__)) {  // Just in case, be sure pids_lock is set.  -mke
-        
-        // Multiple threads in the same process tend to cause deadlocks when locking pids_lock.  So we skip the second attempt to lock pids_lock by the same pid.  Which
-        // sometimes causes pids_lock not to be set.  We lock it here, and then unlock below.  -mke
-       //printk("WARNING: pids_lock was not set (Me: %d:%s) (Current: %d:%s) (Last: %d:%s)\n", task->pid, task->comm, current->pid, current->comm, pids_lock.pid, pids_lock.comm);
-       Ishould = true;
-    }
-    
-    signal_pending = !!(current->pending & ~current->blocked);
-    count = -4000;
-    while(((critical_region_count(task) > 1) || (locks_held_count(task)) || (signal_pending)) && (count < 0)) { // Wait for now, task is in one or more critical sections, and/or has locks
-        nanosleep(&lock_pause, NULL);
-        signal_pending = !!(current->blocked);
-        count++;
-    }
-    list_remove(&task->siblings);
-    struct pid *pid = pid_get(task->pid);
-    pid->task = NULL;
-    
-    signal_pending = !!(current->pending & ~current->blocked);
-    count = -4000;
-    while(((critical_region_count(task) > 1) || (locks_held_count(task)) || (signal_pending)) && (count < 0)) { // Wait for now, task is in one or more critical sections, and/or has locks
-        nanosleep(&lock_pause, NULL);
-        signal_pending = !!(current->blocked);
-        count++;
-    }
-    list_remove(&pid->alive);
-    
-    signal_pending = !!(current->pending & ~current->blocked);
-    count = -4000;
-    while(((critical_region_count(task) > 1) || (locks_held_count(task)) || (signal_pending)) && (count < 0)) { // Wait for now, task is in one or more critical sections, and/or has locks
-        nanosleep(&lock_pause, NULL);
-        signal_pending = !!(current->blocked); // Be less stringent -mke
-        count++;
-    }
-    
-    if(Ishould)
-        unlock(&pids_lock);
-    
     free(task);
 }
+
 
 void run_at_boot(void) {  // Stuff we run only once, at boot time.
     //atomic_thread_fence(__ATOMIC_SEQ_CST);
     struct uname uts;
     do_uname(&uts);
     unsigned short ncpu = get_cpu_count();
-    if(!lock_init(&pids_lock, "pids\0") ||
-       !lock_init(&block_lock, "block\0")) {
+    if(lock_init(&pids_lock, "pids\0") ||
+       lock_init(&block_lock, "block\0")) {
         printk("ERROR: initializing internal locks at boot\n");
     }
        
@@ -238,7 +230,7 @@ void run_at_boot(void) {  // Stuff we run only once, at boot time.
 
 }
 
-void task_run_current() {
+void task_run_current(void) {
     struct cpu_state *cpu = &current->cpu;
     struct tlb tlb = {};
     tlb_refresh(&tlb, &current->mem->mmu);
@@ -281,7 +273,7 @@ static void *task_thread(void *task) {
 }
 
 static pthread_attr_t task_thread_attr;
-__attribute__((constructor)) static void create_attr() {
+__attribute__((constructor)) static void create_attr(void) {
     pthread_attr_init(&task_thread_attr);
     pthread_attr_setdetachstate(&task_thread_attr, PTHREAD_CREATE_DETACHED);
 }
@@ -291,13 +283,13 @@ void task_start(struct task *task) {
         die("could not create thread");
 }
 
-int_t sys_sched_yield() {
+int_t sys_sched_yield(void) {
     STRACE("sched_yield()");
     sched_yield();
     return 0;
 }
 
-void update_thread_name() {
+void update_thread_name(void) {
     char name[16]; // As long as Linux will let us make this
     snprintf(name, sizeof(name), "-%d", current->pid);
     size_t pid_width = strlen(name);

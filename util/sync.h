@@ -197,39 +197,18 @@ static inline void atomic_l_lockf(wrlock_t *lock, const char *lname, const char 
 }
     
 static inline void atomic_l_unlockf(wrlock_t *lock, const char *lname, const char *file, int line) {
-    if (!doEnableExtraLocking)
+    if ((!doEnableExtraLocking) || (lock->pid == 0))
         return;
     
     int rc = pthread_mutex_unlock(&lock->m);
     if (rc) {
         // handle the error. As an example, we'll just print the error and exit
-        printk("ERROR: Failed to unlock mutex: %s\n", strerror(rc));
+        printk("ERROR: Failed to unlock mutex: (%s:%d) %d\n", strerror(rc), file, line, lock->pid);
         exit(EXIT_FAILURE);
     } else {
         modify_locks_held_count_wrapper(-1);
     }
 }
-
-/* static inline void atomic_l_unlockf(wrlock_t *lock, const char *lname, const char *file, int line) {
-    if (!doEnableExtraLocking)
-        return;
-
-    int res = my_pthread_mutex_timedunlock(&atomic_l_lock_m);
-
-    if (AL_DEBUG) {
-        int lval = atomic_load(&lock->val);
-        printf("aUNlock :(%p:%d) (%s) %s:%d (%d)\n", lock, lval, lname, file, line, current_pid());
-    }
-    
-    if (res != 0) {
-        // Handle error.
-        printf("aUNlock : Error %d occurred while trying to unlock %p in %s:%d (%d)\n", res, lock, file, line, current_pid());
-    }
-
-    modify_locks_held_count_wrapper(-1);
-    critical_region_modify_wrapper(-1, "atomic_l_unlockf\0", 314);
-}
-*/
 
 typedef struct {
     pthread_cond_t cond;

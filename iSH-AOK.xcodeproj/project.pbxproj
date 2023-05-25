@@ -90,7 +90,6 @@
 		497F6D2F254E5EA600C82F46 /* random.c in Sources */ = {isa = PBXBuildFile; fileRef = 497F6C7E254E5C9700C82F46 /* random.c */; };
 		497F6D30254E5EA600C82F46 /* resource.c in Sources */ = {isa = PBXBuildFile; fileRef = 497F6CA0254E5C9800C82F46 /* resource.c */; };
 		497F6D31254E5EA600C82F46 /* signal.c in Sources */ = {isa = PBXBuildFile; fileRef = 497F6C87254E5C9700C82F46 /* signal.c */; };
-		497F6D32254E5EA600C82F46 /* task.c in Sources */ = {isa = PBXBuildFile; fileRef = 497F6C78254E5C9700C82F46 /* task.c */; };
 		497F6D33254E5EA600C82F46 /* time.c in Sources */ = {isa = PBXBuildFile; fileRef = 497F6C89254E5C9700C82F46 /* time.c */; };
 		497F6D34254E5EA600C82F46 /* tls.c in Sources */ = {isa = PBXBuildFile; fileRef = 497F6C8E254E5C9700C82F46 /* tls.c */; };
 		497F6D35254E5EA600C82F46 /* uname.c in Sources */ = {isa = PBXBuildFile; fileRef = 497F6C93254E5C9800C82F46 /* uname.c */; };
@@ -109,6 +108,7 @@
 		5D202C132A12D47800B8A2E8 /* wrlock.c in Sources */ = {isa = PBXBuildFile; fileRef = 5D202C0F2A12BFAE00B8A2E8 /* wrlock.c */; };
 		5D202C142A12E3DE00B8A2E8 /* wrlock.c in Sources */ = {isa = PBXBuildFile; fileRef = 5D202C0F2A12BFAE00B8A2E8 /* wrlock.c */; };
 		5D202C152A12E3E900B8A2E8 /* rlock.c in Sources */ = {isa = PBXBuildFile; fileRef = 5D202C0E2A12BFAE00B8A2E8 /* rlock.c */; };
+		5D7FEBEE2A1BC903008340AC /* task.c in Sources */ = {isa = PBXBuildFile; fileRef = 5D7FEBED2A1BC903008340AC /* task.c */; };
 		5D85FD1D2A10590000DDD121 /* ExceptionExfiltrator.m in Sources */ = {isa = PBXBuildFile; fileRef = 5D85FD1C2A10590000DDD121 /* ExceptionExfiltrator.m */; };
 		BB0F552E239F8A790032A2A1 /* Icons.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB0F552D239F8A790032A2A1 /* Icons.plist */; };
 		BB10E5C9248DBAAC009C7A74 /* libarchive.a in Frameworks */ = {isa = PBXBuildFile; fileRef = BB10E5C8248DBAA1009C7A74 /* libarchive.a */; platformFilter = ios; };
@@ -203,7 +203,7 @@
 		BBC3863F276817AD00CC8C2E /* CurrentRoot.m in Sources */ = {isa = PBXBuildFile; fileRef = BB565EA32734F1FB00C93EAE /* CurrentRoot.m */; };
 		BBD23D5F258DA450003DCB40 /* Screenshots.m in Sources */ = {isa = PBXBuildFile; fileRef = BBD23D5E258DA450003DCB40 /* Screenshots.m */; };
 		BBD23D77258DA4BC003DCB40 /* SnapshotHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBD23D76258DA4BC003DCB40 /* SnapshotHelper.swift */; };
-		BBE64AC22A198FCC00589372 /* ExceptionExfiltrator.m in Sources */ = {isa = PBXBuildFile; fileRef = 49FF844A2A06249F00850B7A /* ExceptionExfiltrator.m */; };
+		BBE64AC22A198FCC00589372 /* (null) in Sources */ = {isa = PBXBuildFile; };
 		BBECF3AD269132F400DEC937 /* LinuxInterop.c in Sources */ = {isa = PBXBuildFile; fileRef = BBECF39D2691313B00DEC937 /* LinuxInterop.c */; };
 		BBECF3AE2691330F00DEC937 /* libiSH-AOKLinux.a in Frameworks */ = {isa = PBXBuildFile; fileRef = BBECF3A22691314C00DEC937 /* libiSH-AOKLinux.a */; };
 		BBECF3B9269136FB00DEC937 /* liblinux.a in Frameworks */ = {isa = PBXBuildFile; fileRef = BBECF3B8269136E100DEC937 /* liblinux.a */; };
@@ -528,7 +528,6 @@
 		497F6C6A254E5C7F00C82F46 /* modrm.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = modrm.h; sourceTree = "<group>"; };
 		497F6C6B254E5C7F00C82F46 /* tlb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = tlb.h; sourceTree = "<group>"; };
 		497F6C77254E5C9700C82F46 /* mm.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = mm.h; sourceTree = "<group>"; };
-		497F6C78254E5C9700C82F46 /* task.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = task.c; path = ../../task.c; sourceTree = "<group>"; };
 		497F6C79254E5C9700C82F46 /* vdso.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = vdso.c; sourceTree = "<group>"; };
 		497F6C7A254E5C9700C82F46 /* ipc.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = ipc.c; sourceTree = "<group>"; };
 		497F6C7B254E5C9700C82F46 /* calls.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = calls.h; sourceTree = "<group>"; };
@@ -587,6 +586,7 @@
 		5D202C0E2A12BFAE00B8A2E8 /* rlock.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = rlock.c; sourceTree = "<group>"; };
 		5D202C0F2A12BFAE00B8A2E8 /* wrlock.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = wrlock.c; sourceTree = "<group>"; };
 		5D272493277C20DF0005F2A8 /* iSHFileProviderRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iSHFileProviderRelease.entitlements; sourceTree = "<group>"; };
+		5D7FEBED2A1BC903008340AC /* task.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = task.c; sourceTree = "<group>"; };
 		5D85FD1B2A10590000DDD121 /* ExceptionExfiltrator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ExceptionExfiltrator.h; sourceTree = "<group>"; };
 		5D85FD1C2A10590000DDD121 /* ExceptionExfiltrator.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ExceptionExfiltrator.m; sourceTree = "<group>"; };
 		5D8ACEF9284BF122003C50D3 /* net.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = net.c; sourceTree = "<group>"; };
@@ -1129,6 +1129,7 @@
 		BB7D933C2087C2880008DA78 /* kernel */ = {
 			isa = PBXGroup;
 			children = (
+				5D7FEBED2A1BC903008340AC /* task.c */,
 				5D8CEFF92894C81400D24ED8 /* resource_locking.h */,
 				497F6C9F254E5C9800C82F46 /* calls.c */,
 				497F6C7B254E5C9700C82F46 /* calls.h */,
@@ -1164,7 +1165,6 @@
 				497F6CA1254E5C9800C82F46 /* resource.h */,
 				497F6C87254E5C9700C82F46 /* signal.c */,
 				497F6C7C254E5C9700C82F46 /* signal.h */,
-				497F6C78254E5C9700C82F46 /* task.c */,
 				497F6C9C254E5C9800C82F46 /* task.h */,
 				497F6C89254E5C9700C82F46 /* time.c */,
 				497F6C86254E5C9700C82F46 /* time.h */,
@@ -2085,7 +2085,6 @@
 				497F6D2F254E5EA600C82F46 /* random.c in Sources */,
 				497F6D30254E5EA600C82F46 /* resource.c in Sources */,
 				497F6D31254E5EA600C82F46 /* signal.c in Sources */,
-				497F6D32254E5EA600C82F46 /* task.c in Sources */,
 				497F6D33254E5EA600C82F46 /* time.c in Sources */,
 				497F6D34254E5EA600C82F46 /* tls.c in Sources */,
 				497F6D35254E5EA600C82F46 /* uname.c in Sources */,
@@ -2124,6 +2123,7 @@
 				5D202C122A12D46E00B8A2E8 /* rlock.c in Sources */,
 				BB28C7BB268975AE00BDC834 /* LocationDevice.m in Sources */,
 				BB28C7BA268975AA00BDC834 /* iOSFS.m in Sources */,
+				5D7FEBEE2A1BC903008340AC /* task.c in Sources */,
 				BB28C7BC268975B000BDC834 /* PasteboardDevice.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2146,7 +2146,7 @@
 				BBBFE94921C5CFF100509DD5 /* NSError+ISHErrno.m in Sources */,
 				BB9C7B87240A2B1E00F5D4F0 /* AppGroup.m in Sources */,
 				BB88F4942154760800A341FD /* FileProviderExtension.m in Sources */,
-				BBE64AC22A198FCC00589372 /* ExceptionExfiltrator.m in Sources */,
+				BBE64AC22A198FCC00589372 /* (null) in Sources */,
 				BB88F4972154760800A341FD /* FileProviderItem.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2525,10 +2525,9 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = BB0B85A42586F1CB00208600 /* ProjectDebug.xcconfig */;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 492;
+				CURRENT_PROJECT_VERSION = 494;
 				DEAD_CODE_STRIPPING = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
-				CURRENT_PROJECT_VERSION = 494;
 			};
 			name = "Debug-ApplePleaseFixFB19282108";
 		};
@@ -2536,10 +2535,10 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = BB0B85A52586F1E100208600 /* ProjectRelease.xcconfig */;
 			buildSettings = {
+				CURRENT_PROJECT_VERSION = 494;
 				DEAD_CODE_STRIPPING = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				SWIFT_COMPILATION_MODE = wholemodule;
-				CURRENT_PROJECT_VERSION = 494;
 			};
 			name = Release;
 		};
@@ -2598,9 +2597,9 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = BB28C7532689522C00BDC834 /* ProjectDebugLinux.xcconfig */;
 			buildSettings = {
+				CURRENT_PROJECT_VERSION = 494;
 				DEAD_CODE_STRIPPING = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
-				CURRENT_PROJECT_VERSION = 494;
 			};
 			name = DebugLinux;
 		};
@@ -2926,10 +2925,10 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = BB28C7522689522700BDC834 /* ProjectReleaseLinux.xcconfig */;
 			buildSettings = {
+				CURRENT_PROJECT_VERSION = 494;
 				DEAD_CODE_STRIPPING = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				SWIFT_COMPILATION_MODE = wholemodule;
-				CURRENT_PROJECT_VERSION = 494;
 			};
 			name = ReleaseLinux;
 		};

@@ -77,16 +77,30 @@ static int dyn_open_char(int major, int minor, struct fd *fd) {
 }
 
 static int rtc_open(int major, int minor, struct fd *fd) {
-    return dyn_open(DEV_BLOCK, major, minor, fd);
+    return dyn_open(DEV_CHAR, major, minor, fd);
 }
 
-struct tm rtc_read(struct tm *timeinfo) {
+/* struct tm rtc_read(struct tm *timeinfo) {
     time_t rawtime;
     //struct tm timeinfo;
 
     time ( &rawtime );
     timeinfo = localtime ( &rawtime );
     return *timeinfo;
+} */
+
+struct tm rtc_read(void) {
+    time_t rawtime;
+    struct tm *timeinfo;
+
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+    
+    // Copy the structure, because the pointer returned by localtime
+    // might be reused in subsequent calls
+    struct tm result = *timeinfo;
+
+    return result;
 }
 
 struct dev_ops dyn_dev_char = {
