@@ -61,6 +61,8 @@ static void deliver_signal_unlocked(struct task *task, int sig, struct siginfo_ 
     
     if(task->exiting)
         return; // Do nothing when a task is in the process of exiting.  -mke
+    
+    int count = 0;
 
     sigset_add(&task->pending, sig);
     struct sigqueue *sigqueue = malloc(sizeof(struct sigqueue));
@@ -80,6 +82,7 @@ static void deliver_signal_unlocked(struct task *task, int sig, struct siginfo_ 
         unlock(&task->sighand->lock);
 retry:
         simple_lockt(&task->waiting_cond_lock, 0);
+        count++;
         if (task->waiting_cond != NULL) {
             bool mine = false;
             if (trylock(task->waiting_lock, __FILE_NAME__, __LINE__) == EBUSY) {
@@ -87,7 +90,12 @@ retry:
                     mine = true;
                 if (!mine) {
                     unlock(&task->waiting_cond_lock);
-                    goto retry;
+                    if(count < 40000) {
+                        goto retry;
+                    } else {
+                        printk("ERROR: deliver_signal_unlocked() is stuck, aborting\n");
+                        return;
+                    }
                 }
             }
             notify(task->waiting_cond);

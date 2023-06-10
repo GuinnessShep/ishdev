@@ -212,10 +212,10 @@ dword_t sys_vfork(void) {
 void vfork_notify(struct task *task) {
     simple_lockt(&task->general_lock, 0);
     if ((task->vfork) && task->pid <= MAX_PID) { // If task->pid is large, badness.  -mke
-        simple_lockt(&task->vfork->lock, 0);
+        //simple_lockt(&task->vfork->lock, 0);
         task->vfork->done = true;
         notify(&task->vfork->cond);
-        unlock(&task->vfork->lock);
+        //unlock(&task->vfork->lock);
     }
     unlock(&task->general_lock);
 }

@@ -127,7 +127,7 @@ void unlock(lock_t *lock) {
     } else if(lock->pid > 0) {
         // It is an error, handle
         //printk("ERROR: Lock %d (%d:%s) attempted unlock by non locking owner (%d: %s)\n", lock, lock->pid, lock->comm, current_comm(), current_pid());
-        printk("ERROR: Lock %d (%d:%s) attempted unlock by non locking owner\n", lock, lock->pid, lock->comm);
+        printk("ERROR: Lock %d (%d:%s) (%d) attempted unlock by non locking owner\n", lock, lock->pid, lock->comm, pthread_self());
     }
     
     pthread_mutex_unlock(&lock->m);

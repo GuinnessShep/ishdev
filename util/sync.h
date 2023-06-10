@@ -50,6 +50,10 @@ typedef struct {
         atomic_int count; // Use atomic int for reads_pending
     } reads_pending;
     struct {
+        pthread_mutex_t lock;
+        atomic_int count; // Use atomic int for reads_pending
+    } writes_pending;
+    struct {
         pthread_t owner; // Keep track of the owner of the lock, currently only used on write locks -mke
         int count; // If the same thread tries to lock/unlock , increment or decrement until 0 and carry on. -mke
     } write_recursion;
@@ -67,12 +71,12 @@ typedef struct {
 } wrlock_t;
 
 void wrlock_init(wrlock_t *lock);
-void write_lock(wrlock_t *lock, const char *file, int line);
-void read_lock(wrlock_t *lock, const char *file, int line);
-void read_unlock(wrlock_t *lock, const char *file, int line);
-void read_to_write_lock(wrlock_t *lock);
-void write_unlock(wrlock_t *lock, const char *file, int line);
-void write_to_read_lock(wrlock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line);
+void lock_writable(wrlock_t *lock, const char *file, int line);
+void lock_read_only(wrlock_t *lock, const char *file, int line);
+void unlock_read_only(wrlock_t *lock, const char *file, int line);
+void lock_read_to_writable(wrlock_t *lock);
+void unlock_writable(wrlock_t *lock, const char *file, int line);
+void lock_write_to_read_only(wrlock_t *lock, __attribute__((unused)) const char *file, __attribute__((unused)) int line);
 void write_unlock_and_destroy(wrlock_t *lock);
 
 typedef struct {
@@ -190,22 +194,21 @@ static inline void atomic_l_lockf(wrlock_t *lock, const char *lname, const char 
     } else {
         safe_strncpy((char *)&lock->comm, current_comm(), 16);
         safe_strncpy((char *)&lock->lname, lname, 16);
+        atomic_l_lock_m.is_locked = 1;
         modify_locks_held_count_wrapper(1);
     }
-
-    my_pthread_mutex_timedunlock(&atomic_l_lock_m); // Always unlock the mutex after done using it
 }
     
 static inline void atomic_l_unlockf(wrlock_t *lock, const char *lname, const char *file, int line) {
     if ((!doEnableExtraLocking) || (lock->pid == 0))
         return;
     
-    int rc = pthread_mutex_unlock(&lock->m);
-    if (rc) {
+    int res = my_pthread_mutex_timedunlock(&atomic_l_lock_m); // Always unlock the mutex after done using it
+    if (res) {
         // handle the error. As an example, we'll just print the error and exit
-        printk("ERROR: Failed to unlock mutex: (%s:%d) %d\n", strerror(rc), file, line, lock->pid);
-        exit(EXIT_FAILURE);
+        printk("ERROR: Failed to unlock mutex: %s (%s:%d) %d\n", lname, strerror(res), file, line, lock->pid);
     } else {
+        atomic_l_lock_m.is_locked = 0;
         modify_locks_held_count_wrapper(-1);
     }
 }
@@ -213,6 +216,7 @@ static inline void atomic_l_unlockf(wrlock_t *lock, const char *lname, const cha
 typedef struct {
     pthread_cond_t cond;
 } cond_t;
+
 #define COND_INITIALIZER ((cond_t) {PTHREAD_COND_INITIALIZER})
 
 // Must call before using the condition

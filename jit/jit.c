@@ -49,7 +49,7 @@ void jit_free(struct jit *jit) {
     unlock(&jit->lock);
     free(jit->page_hash);
     free(jit->hash);
-    write_lock(&jit->jetsam_lock, __FILE_NAME__, __LINE__);
+    lock_writable(&jit->jetsam_lock, __FILE_NAME__, __LINE__);
     free(jit);
 }
 
@@ -212,7 +212,7 @@ static inline size_t jit_cache_hash(addr_t ip) {
 
 static int cpu_step_to_interrupt(struct cpu_state *cpu, struct tlb *tlb) {
     struct jit *jit = cpu->mmu->jit;
-    read_lock(&jit->jetsam_lock, __FILE_NAME__, __LINE__);
+    lock_read_only(&jit->jetsam_lock, __FILE_NAME__, __LINE__);
 
     struct jit_block **cache = calloc(JIT_CACHE_SIZE, sizeof(*cache));
     struct jit_frame *frame = malloc(sizeof(struct jit_frame));
@@ -276,7 +276,7 @@ static int cpu_step_to_interrupt(struct cpu_state *cpu, struct tlb *tlb) {
 
     free(frame);
     free(cache);
-    read_unlock(&jit->jetsam_lock, __FILE_NAME__, __LINE__);
+    unlock_read_only(&jit->jetsam_lock, __FILE_NAME__, __LINE__);
     return interrupt;
 
 }
@@ -313,13 +313,13 @@ int cpu_run_to_interrupt(struct cpu_state *cpu, struct tlb *tlb) {
         // this point, so they will all clear out their block pointers
         // TODO: use RCU for better performance
         unlock(&jit->lock);
-        write_lock(&jit->jetsam_lock, __FILE_NAME__, __LINE__);
+        lock_writable(&jit->jetsam_lock, __FILE_NAME__, __LINE__);
         simple_lockt(&jit->lock, 0);
         while(critical_region_count(current) > 3) {// Yes, this is weird.  It might not work, but I'm trying.  -mke
             nanosleep(&lock_pause, NULL);          // Yes, this has triggered at least once.  Is it doing any good though? -mke
         }
         jit_free_jetsam(jit);
-        write_unlock(&jit->jetsam_lock, __FILE_NAME__, __LINE__);
+        unlock_writable(&jit->jetsam_lock, __FILE_NAME__, __LINE__);
         unlock(&jit->lock);
         return interrupt;
     }

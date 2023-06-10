@@ -373,9 +373,9 @@ void handle_interrupt(int interrupt) {
     } else if (interrupt == INT_GPF) {
         // some page faults, such as stack growing or CoW clones, are handled by mem_ptr
         ////critical_region_modify(current, 1, __FILE_NAME__, __LINE__);
-        read_lock(&current->mem->lock, __FILE_NAME__, __LINE__);
+        lock_read_only(&current->mem->lock, __FILE_NAME__, __LINE__);
         void *ptr = mem_ptr(current->mem, cpu->segfault_addr, cpu->segfault_was_write ? MEM_WRITE : MEM_READ);
-        read_unlock(&current->mem->lock, __FILE_NAME__, __LINE__);
+        unlock_read_only(&current->mem->lock, __FILE_NAME__, __LINE__);
         ////critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
         if (ptr == NULL) {
             printk("ERROR: %d(%s) page fault on 0x%x at 0x%x\n", current->pid, current->comm, cpu->segfault_addr, cpu->eip);

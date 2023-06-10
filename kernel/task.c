@@ -35,7 +35,11 @@ lock_t block_lock;
 struct list alive_pids_list;
 
 static bool pid_empty(struct pid *pid) {
-    return pid->task == NULL && list_empty(&pid->session) && list_empty(&pid->pgroup);
+    bool taskEmpty = pid->task == NULL;
+    bool sessionEmpty = list_empty(&pid->session);
+    bool pgroupEmpty = list_empty(&pid->pgroup);
+    
+    return taskEmpty && sessionEmpty && pgroupEmpty;
 }
 
 struct pid *pid_get(dword_t id) {
@@ -103,18 +107,32 @@ dword_t get_count_of_alive_tasks(void) {
 }
 
 static struct pid *allocate_pid(void) {
-    complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
-    do {
-        last_allocated_pid++;
-        if (last_allocated_pid > MAX_PID) last_allocated_pid = 1;
-    } while (!pid_empty(&pids[last_allocated_pid]));
+    struct pid *pid = NULL;
 
-    struct pid *pid = &pids[last_allocated_pid];
-    pid->id = last_allocated_pid;
-    list_init(&pid->alive);
-    list_init(&pid->session);
-    list_init(&pid->pgroup);
+    complex_lockt(&pids_lock, 0, __FILE_NAME__, __LINE__);
+
+    for (dword_t i = 1; i <= MAX_PID; ++i) {
+        // Cycle through the pids array in a circular manner
+        dword_t index = (last_allocated_pid + i) % MAX_PID;
+        if (index == 0) index = 1;  // Avoid zero index
+
+        if (pid_empty(&pids[index])) {
+            last_allocated_pid = index;
+            pid = &pids[last_allocated_pid];
+            pid->id = last_allocated_pid;
+            list_init(&pid->alive);
+            list_init(&pid->session);
+            list_init(&pid->pgroup);
+            break;
+        }
+    }
+
     unlock(&pids_lock);
+
+    if (pid == NULL) {
+        // All PIDs are occupied. Handle this error in the caller.
+    }
+
     return pid;
 }
 
@@ -148,7 +166,6 @@ struct task *task_create_(struct task *parent) {
 
     *task = (parent != NULL) ? *parent : (struct task) {};
     set_task_pid(task, pid->id);
-    
     pid->task = task;
     list_add(&alive_pids_list, &pid->alive);
 
@@ -236,7 +253,7 @@ void task_run_current(void) {
     tlb_refresh(&tlb, &current->mem->mmu);
     
     while (true) {
-        read_lock(&current->mem->lock, __FILE_NAME__, __LINE__);
+        lock_read_only(&current->mem->lock, __FILE_NAME__, __LINE__);
         
         if(!doEnableMulticore) {
             safe_mutex_lock(&multicore_lock);
@@ -244,7 +261,7 @@ void task_run_current(void) {
         
         int interrupt = cpu_run_to_interrupt(cpu, &tlb);
         
-        read_unlock(&current->mem->lock, __FILE_NAME__, __LINE__);
+        unlock_read_only(&current->mem->lock, __FILE_NAME__, __LINE__);
         
         if(!doEnableMulticore)
             pthread_mutex_unlock(&multicore_lock);

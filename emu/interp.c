@@ -608,7 +608,7 @@ flatten __no_instrument void cpu_run(struct cpu_state *cpu) {
     int i = 0;
     struct tlb tlb = {.mem = cpu->mem};
     tlb_flush(&tlb);
-    read_lock(&cpu->mem->lock, __FILE_NAME__, __LINE__);
+    lock_read_only(&cpu->mem->lock, __FILE_NAME__, __LINE__);
     int changes = cpu->mem->changes;
     while (true) {
         int interrupt = cpu_step32(cpu, &tlb);
@@ -618,9 +618,9 @@ flatten __no_instrument void cpu_run(struct cpu_state *cpu) {
         }
         if (interrupt != INT_NONE) {
             cpu->trapno = interrupt;
-            read_unlock(&cpu->mem->lock, __FILE_NAME__, __LINE__);
+            unlock_read_only(&cpu->mem->lock, __FILE_NAME__, __LINE__);
             handle_interrupt(interrupt);
-            read_lock(&cpu->mem->lock, __FILE_NAME__, __LINE__);
+            lock_read_only(&cpu->mem->lock, __FILE_NAME__, __LINE__);
             if (tlb.mem != cpu->mem)
                 tlb.mem = cpu->mem;
             if (cpu->mem->changes != changes) {

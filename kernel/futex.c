@@ -113,9 +113,9 @@ static void futex_put(struct futex *futex) {
 
 static int futex_load(struct futex *futex, dword_t *out) {
     assert(futex->mem == current->mem);
-    read_lock(&current->mem->lock, __FILE_NAME__, __LINE__);
+    lock_read_only(&current->mem->lock, __FILE_NAME__, __LINE__);
     dword_t *ptr = mem_ptr(current->mem, futex->addr, MEM_READ);
-    read_unlock(&current->mem->lock, __FILE_NAME__, __LINE__);
+    unlock_read_only(&current->mem->lock, __FILE_NAME__, __LINE__);
     if (ptr == NULL)
         return 1;
     *out = *ptr;

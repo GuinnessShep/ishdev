@@ -44,7 +44,7 @@ void mem_init(struct mem *mem) {
 }
 
 void mem_destroy(struct mem *mem) {
-    write_lock(&mem->lock, __FILE_NAME__, __LINE__);
+    lock_writable(&mem->lock, __FILE_NAME__, __LINE__);
     pt_unmap_always(mem, 0, MEM_PAGES);
 #if ENGINE_JIT
     jit_free(mem->mmu.jit);
@@ -55,20 +55,22 @@ void mem_destroy(struct mem *mem) {
     }
     free(mem->pgdir);
     write_unlock_and_destroy(&mem->lock); 
-}
+} 
 
-/*
-void mem_destroy(struct mem *mem) {
+
+/* void mem_destroy(struct mem *mem) {
     int check;
     
     do { // Loop until there are no pending reads for this memory
-        check = atomic_load(&mem->lock.reads_pending);
+        check = atomic_load(&mem->lock.reads_pending.count);
         while(check) {
-            check = atomic_load(&mem->lock.reads_pending);
+            check = atomic_load(&mem->lock.reads_pending.count);
         }
-        write_lock(&mem->lock, __FILE_NAME__, __LINE__);
-        if(atomic_load(&mem->lock.reads_pending)) {
-           write_unlock(&mem->lock, __FILE_NAME__, __LINE__);
+        lock_writable(&mem->lock, __FILE_NAME__, __LINE__);
+        if(atomic_load(&mem->lock.reads_pending.count)) {
+           unlock_writable(&mem->lock, __FILE_NAME__, __LINE__);
+        } else {
+            check = 0;
         }
     } while(check);
        
@@ -102,8 +104,7 @@ void mem_destroy(struct mem *mem) {
     mem->pgdir = NULL; //mkemkemke Trying something here
     
     write_unlock_and_destroy(&mem->lock);
-}
-*/
+} */
 
 #define PGDIR_TOP(page) ((page) >> 10)
 #define PGDIR_BOTTOM(page) ((page) & (MEM_PGDIR_SIZE - 1))
@@ -356,9 +357,9 @@ void *mem_ptr(struct mem *mem, addr_t addr, int type) {
         // called with the read lock.
         // This locking stuff is copy/pasted for all the code in this function
         // which changes memory maps.
-        read_to_write_lock(&mem->lock);
+        lock_read_to_writable(&mem->lock);
         pt_map_nothing(mem, page, 1, P_WRITE | P_GROWSDOWN);
-        write_to_read_lock(&mem->lock, __FILE_NAME__, __LINE__);
+        lock_write_to_read_only(&mem->lock, __FILE_NAME__, __LINE__);
 
         entry = mem_pt(mem, page);
     }
@@ -384,19 +385,19 @@ void *mem_ptr(struct mem *mem, addr_t addr, int type) {
         if (entry->flags & P_COW) {
             simple_lockt(&current->general_lock, 0);  // prevent elf_exec from doing mm_release while we are in flight?  -mke
             //critical_region_modify(current, 1, __FILE_NAME__, __LINE__);
-            read_to_write_lock(&mem->lock);
+            lock_read_to_writable(&mem->lock);
             void *copy = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
             void *data = (char *) entry->data->data + entry->offset;
             //critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
 
             // copy/paste from above
             critical_region_modify(current, 1,__FILE_NAME__, __LINE__);
-            //read_to_write_lock(&mem->lock);
+            //read_to_lock_writable(&mem->lock);
             memcpy(copy, data, PAGE_SIZE);  //mkemkemke  Crashes here a lot when running both the go and parallel make test. 01 June 2022
             critical_region_modify(current, -1, __FILE_NAME__, __LINE__);
             pt_map(mem, page, 1, copy, 0, entry->flags &~ P_COW);
             unlock(&current->general_lock);
-            write_to_read_lock(&mem->lock, __FILE_NAME__, __LINE__);
+            lock_write_to_read_only(&mem->lock, __FILE_NAME__, __LINE__);
             
         }
         

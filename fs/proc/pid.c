@@ -202,7 +202,7 @@ void proc_maps_dump(struct task *task, struct proc_data *buf) {
     if (mem == NULL)
         return;
 
-    read_lock(&mem->lock, __FILE_NAME__, __LINE__);
+    lock_read_only(&mem->lock, __FILE_NAME__, __LINE__);
     page_t page = 0;
     while (page < MEM_PAGES) {
         // find a region
@@ -249,7 +249,7 @@ void proc_maps_dump(struct task *task, struct proc_data *buf) {
                 0, // inode
                 path);
     }
-    read_unlock(&mem->lock, __FILE_NAME__, __LINE__);
+    unlock_read_only(&mem->lock, __FILE_NAME__, __LINE__);
 }
 
 static int proc_pid_maps_show(struct proc_entry *entry, struct proc_data *buf) {
