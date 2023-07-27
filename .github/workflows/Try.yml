@@ -1,0 +1,39 @@
+name: try Build and Upload IPA
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-mac:
+    runs-on: macos-13
+    strategy:
+      matrix:
+        kernel: [ish, linux]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+          
+      - name: Install Python3 and required packages
+        run: |
+          brew install python3
+          pip3 install requests
+          
+      - name: Checkout AutoBuild-ipa repository
+        run: |
+          git clone https://github.com/PurpleSweetPotatoes/AutoBuild-ipa.git
+          
+      - name: Give execute permissions to scripts
+        run: |
+          chmod +x AutoBuild-ipa/start.sh
+          chmod +x AutoBuild-ipa/buildIpa.sh
+          chmod +x AutoBuild-ipa/uploadIpa.sh
+          chmod +x AutoBuild-ipa/ipaInfo.sh
+          
+      - name: Build IPA
+        run: |
+          ./AutoBuild-ipa/buildIpa.sh 0 $GITHUB_WORKSPACE
