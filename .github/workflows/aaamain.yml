@@ -10,9 +10,10 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3.5.3
         with:
           submodules: true
+          token: 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
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
