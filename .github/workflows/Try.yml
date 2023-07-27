@@ -1,4 +1,4 @@
-name: try Build and Upload IPA
+name: Build and Upload IPA
 
 on:
   push:
@@ -34,6 +34,7 @@ jobs:
           chmod +x AutoBuild-ipa/uploadIpa.sh
           chmod +x AutoBuild-ipa/ipaInfo.sh
           
-      - name: Build IPA
+      - name: Run AutoBuild-ipa scripts
         run: |
-          ./AutoBuild-ipa/buildIpa.sh 0 $GITHUB_WORKSPACE
+          cd AutoBuild-ipa
+          ./start.sh
