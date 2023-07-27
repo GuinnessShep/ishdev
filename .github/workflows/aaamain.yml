@@ -1,0 +1,37 @@
+name: CIaaa
+
+on:
+  push:
+  pull_request:
+    branches: [master]
+
+jobs:
+  build-and-upload:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 2.7.3 # Use a version compatible with Fastlane
+
+      - name: Install dependencies
+        run: |
+          gem install bundler
+          bundle config path vendor/bundle
+          bundle install --jobs 4 --retry 3
+
+      - name: Build IPA
+        run: |
+          bundle exec fastlane build
+          mv ./iSH.ipa ./myipabuild.ipa # Rename the file to prevent any conflict in naming
+
+      - name: Upload IPA to transfer.sh
+        run: |
+          echo "Uploading iSH-build2.ipa to transfer.sh"
+          UPLOAD_LINK=$(curl --upload-file ./myipabuild.ipa https://transfer.sh/myipabuild.ipa)
+          echo "Upload complete. You can download the file at $UPLOAD_LINK"
