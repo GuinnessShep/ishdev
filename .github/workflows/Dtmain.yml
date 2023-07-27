@@ -1,0 +1,38 @@
+name: CIsrig
+
+on:
+  push:
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: macos-13
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+
+      - name: Set Xcode version
+        run: |
+          sudo xcode-select -s /Applications/Xcode_14.3.app
+
+      - name: Install Fastlane
+        run: |
+          brew install ruby
+          gem install fastlane -NV
+
+      - name: Install Bundler and Dependencies
+        run: |
+          gem install bundler
+          bundle install
+
+      - name: Execute Fastlane
+        run: bundle exec fastlane upload_build
+
+      - name: Upload to transfer.sh
+        run: |
+          echo "Uploading iSH-appstore.ipa to transfer.sh"
+          UPLOAD_LINK=$(curl --upload-file ./iSH-appstore.ipa https://transfer.sh/iSH-appstore.ipa)
+          echo "Upload complete. You can download the file at $UPLOAD_LINK"
