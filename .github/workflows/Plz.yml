@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [master]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        cc: [clang, gcc]
+        kernel: [ish, linux]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v3
+        with:
+          python-version: '3.x'
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libarchive-dev lld libsqlite3-dev clang
+          pip3 install meson ninja
+      - name: Build
+        run: |
+          meson build -Dengine=jit -Dkernel=${{matrix.kernel}}
+          ninja -C build
+        env:
+          CC: ${{matrix.cc}}
+
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Install dependencies
+        run: |
+          brew install llvm ninja libarchive
+          pip3 install meson
+      - name: Build for iOS
+        run: |
+          open iSH.xcodeproj
+          xcodebuild -project iSH.xcodeproj -scheme iSH -destination 'generic/platform=iOS'
+          xcodebuild archive -scheme iSH -archivePath ./iSH.xcarchive
+          xcodebuild -exportArchive -archivePath ./iSH.xcarchive -exportPath ./iSH.ipa -exportOptionsPlist ./iSHExportOptions.plist
+      - name: Upload to transfer.sh
+        run: |
+          echo "Uploading iSH.ipa to transfer.sh"
+          UPLOAD_LINK=$(curl --upload-file ./iSH.ipa https://transfer.sh/iSH.ipa)
+          echo "Upload complete. You can download the file at $UPLOAD_LINK"
