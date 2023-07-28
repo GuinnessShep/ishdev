@@ -1,0 +1,52 @@
+build-mac:
+  runs-on: macos-13
+  strategy:
+    matrix:
+      kernel: [ish, linux]
+  steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+    - name: Install dependencies
+      run: |
+        sudo xcode-select -s /Applications/Xcode_14.3.app
+        brew install llvm ninja libarchive
+        pip3 install meson
+    - name: Clone Linux
+      if: matrix.kernel == 'linux'
+      run: deps/clone-linux.sh
+    - name: Build
+      if: matrix.kernel == 'ish'
+      run: |
+        if [ ! -d "build" ]; then
+          mkdir build
+        fi
+        xcodebuild -project "ishdev/iSH-AOK.xcodeproj" \
+            -scheme "iSH" \
+            -configuration Release \
+            -derivedDataPath "build/DerivedDataApp" \
+            -destination 'generic/platform=iOS' \
+            clean build \
+            CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS="" CODE_SIGNING_ALLOWED="NO"
+        DD_APP_PATH="build/DerivedDataApp/Build/Products/Release-iphoneos/iSH.app"
+        TARGET_APP="build/iSH.app"
+        cp -r "$DD_APP_PATH" "$TARGET_APP"
+        codesign --remove "$TARGET_APP"
+        if [ -e "$TARGET_APP/_CodeSignature" ]; then
+          rm -rf "$TARGET_APP/_CodeSignature"
+        fi
+        if [ -e "$TARGET_APP/embedded.mobileprovision" ]; then
+          rm -rf "$TARGET_APP/embedded.mobileprovision"
+        fi
+        # Add entitlements
+        chmod a+x ./ldid
+        ./ldid -S./ishdev/app/iSH.entitlements "$TARGET_APP/iSH"
+        mkdir Payload
+        cp -r iSH.app Payload/iSH.app
+        strip Payload/iSH.app/iSH
+        zip -vr iSH.ipa Payload
+        rm -rf iSH.app
+        rm -rf Payload
+    - name: Upload to transfer.sh
+      run: |
+        curl --upload-file ./iSH.ipa https://transfer.sh/iSH.ipa
