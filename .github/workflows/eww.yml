@@ -1,0 +1,47 @@
+name: eww and Package iOS App
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+    - name: Set Xcode version
+      run: sudo xcode-select -s /Applications/Xcode_14.3.app
+    - name: Install dependencies
+      run: |
+        brew install llvm ninja libarchive
+        pip3 install meson
+    - name: Build the project
+      run: |
+        xcodebuild -project "iSH-AOK.xcodeproj" \
+            -scheme "iSH" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            clean build \
+            CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS="" CODE_SIGNING_ALLOWED="NO"
+    - name: Create unsigned IPA
+      run: |
+        DD_APP_PATH="iSH-AOK.xcodeproj/Build/Products/Release-iphoneos/iSH.app"
+        TARGET_APP="build/iSH.app"
+        cp -r "$DD_APP_PATH" "$TARGET_APP"
+        codesign --remove "$TARGET_APP"
+        if [ -e "$TARGET_APP/_CodeSignature" ]; then
+          rm -rf "$TARGET_APP/_CodeSignature"
+        fi
+        if [ -e "$TARGET_APP/embedded.mobileprovision" ]; then
+          rm -rf "$TARGET_APP/embedded.mobileprovision"
+        fi
+        chmod a+x ./ldid
+        ./ldid -S./ishdev/app/iSH.entitlements "$TARGET_APP/iSH"
+        mkdir Payload
+        cp -r "$TARGET_APP" Payload/
+        zip -r iSH.ipa Payload/
+    - name: Upload IPA to transfer.sh
+      run: |
+        curl --upload-file ./iSH.ipa https://transfer.sh/iSH.ipa
