@@ -1,0 +1,83 @@
+name: 1111CD
+
+on:
+  push:
+  pull_request:
+    branches: [master]
+
+env:
+  PYTHON_VERSION: '3.x'
+  ROOT_BUNDLE_IDENTIFIER: 'your.unique.identifier'
+  DEVELOPMENT_TEAM_ID: 'your-dev-team-id'
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        cc: [clang, gcc]
+        kernel: [ish, linux]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install libarchive-dev
+          pip install meson ninja
+      - name: Clone Linux
+        if: matrix.kernel == 'linux'
+        run: deps/clone-linux.sh
+      - name: Build
+        run: |
+          meson build -Dengine=jit -Dkernel=${{matrix.kernel}}
+          ninja -C build
+        env:
+          CC: ${{matrix.cc}}
+      - name: Test
+        if: matrix.kernel == 'ish'
+        run: ninja -C build test
+
+  build-mac:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        kernel: [ish, linux]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Set up Xcode
+        run: |
+          sudo xcode-select --install
+          sudo xcode-select -s /Applications/Xcode.app
+      - name: Install Fastlane
+        run: |
+          brew install ruby
+          gem install bundler
+          brew install fastlane
+      - name: Install dependencies
+        run: |
+          brew install llvm ninja libarchive
+          pip install meson
+      - name: Clone Linux
+        if: matrix.kernel == 'linux'
+        run: deps/clone-linux.sh
+      - name: Build iSH for iOS
+        run: |
+          xcodebuild -project iSH.xcodeproj -scheme iSH -arch arm64 -sdk iphoneos build CODE_SIGNING_ALLOWED=NO
+      - name: Build iSH for Linux
+        if: matrix.kernel == 'linux'
+        run: |
+          xcodebuild -project iSH.xcodeproj -scheme iSH+Linux -arch x86_64 -sdk iphonesimulator build CODE_SIGNING_ALLOWED=NO
+      - name: Execute Fastlane
+        run: fastlane build
+      - name: Upload to transfer.sh
+        run: |
+          echo "Uploading iSH.ipa to transfer.sh"
+          UPLOAD_LINK=$(curl --upload-file ./iSH.ipa https://transfer.sh/iSH.ipa)
+          echo "Upload complete. You can download the file at $UPLOAD_LINK"
