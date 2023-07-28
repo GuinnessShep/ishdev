@@ -1,0 +1,29 @@
+name: Cancel Running Actions
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cancel-runs:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Cancel all running workflow runs except current one
+      run: |
+        TOKEN="${{ secrets.POOP }}"
+        REPO="${{ github.repository }}"
+        RUN_ID="${{ github.run_id }}"
+        GH_API="https://api.github.com"
+
+        echo "Fetching workflow runs..."
+        WORKFLOW_RUNS=$(curl -s -H "Authorization: token $TOKEN" -X GET "${GH_API}/repos/${REPO}/actions/runs")
+
+        echo "Filtering running workflow runs..."
+        RUNNING_WORKFLOW_RUNS=$(echo "$WORKFLOW_RUNS" | jq '[.workflow_runs[] | select(.status=="in_progress" or .status=="queued") | select(.id != '$RUN_ID')]')
+
+        for RUN in $(echo "${RUNNING_WORKFLOW_RUNS}" | jq -r .[].id); do
+          echo "Cancelling run: $RUN..."
+          curl -s -H "Authorization: token $TOKEN" -X POST "${GH_API}/repos/${REPO}/actions/runs/${RUN}/cancel"
+        done
+      env:
+        GITHUB_TOKEN: ${{ secrets.POOP }}
