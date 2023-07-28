@@ -69,11 +69,11 @@ jobs:
         run: deps/clone-linux.sh
       - name: Build iSH for iOS
         run: |
-          xcodebuild -project iSH.xcodeproj -scheme iSH -arch arm64 -sdk iphoneos build CODE_SIGNING_ALLOWED=NO
+          xcodebuild -project iSH-AOK.xcodeproj -scheme iSH -arch arm64 -sdk iphoneos build CODE_SIGNING_ALLOWED=NO
       - name: Build iSH for Linux
         if: matrix.kernel == 'linux'
         run: |
-          xcodebuild -project iSH.xcodeproj -scheme iSH+Linux -arch x86_64 -sdk iphonesimulator build CODE_SIGNING_ALLOWED=NO
+          xcodebuild -project iSH-AOK.xcodeproj -scheme iSH+Linux -arch x86_64 -sdk iphonesimulator build CODE_SIGNING_ALLOWED=NO
       - name: Execute Fastlane
         run: fastlane build
       - name: Upload to transfer.sh
