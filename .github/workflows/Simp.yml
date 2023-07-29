@@ -19,7 +19,7 @@ jobs:
         pip3 install meson
 
     - name: Setup Ninja
-      uses: ashutoshvarma/setup-ninja@v1.2
+      uses: ashutoshvarma/setup-ninja@v1.1
 
     - name: Build
       run: |
