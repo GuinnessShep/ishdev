@@ -1,0 +1,81 @@
+name: abc Build abc
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.x
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y clang lld libsqlite3-dev libarchive-dev
+          pip install meson
+
+      - name: Install Ninja
+        run: |
+          git clone https://github.com/ninja-build/ninja.git
+          cd ninja
+          ./configure.py --bootstrap
+          sudo install ninja /usr/local/bin/
+      
+      - name: Build
+        run: |
+          cd ${GITHUB_WORKSPACE}
+          meson build
+          cd build
+          ninja
+
+      - name: Prepare Alpine Linux Filesystem
+        run: |
+          cd ${GITHUB_WORKSPACE}
+          alpine_latest_url=$(curl -s https://alpinelinux.org/downloads/ | grep -o 'http.*x86.tar.gz' | head -n 1)
+          wget $alpine_latest_url
+          alpine_file=$(basename $alpine_latest_url)
+          cd build
+          ./tools/fakefsify ../$alpine_file alpine
+
+      - name: Run test
+        run: |
+          cd ${GITHUB_WORKSPACE}/build
+          ./ish -f alpine /bin/login -f root
+
+      - name: Archive the Alpine Filesystem
+        run: |
+          cd ${GITHUB_WORKSPACE}/build
+          tar -czvf alpine_fs.tar.gz alpine
+
+  build-ios:
+    needs: build
+    runs-on: macOS-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          brew install llvm libarchive
+
+      - name: Set up Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode_12.4.app
+          # Remember to replace with your actual Developer Team ID
+          DEVELOPER_TEAM_ID="YOUR_TEAM_ID"
+          plutil -replace DevelopmentTeam -string $DEVELOPER_TEAM_ID iSH.xcconfig
+
+      - name: Build iOS app
+        run: |
+          # Placeholder for building your iOS app
+          # Generally, you would use xcodebuild for this purpose
