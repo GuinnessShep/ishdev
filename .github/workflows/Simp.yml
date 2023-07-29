@@ -1,27 +1,33 @@
-name: simp Build
+name: Build iSH
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build:
+
     runs-on: ubuntu-latest
+
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Set up Python 3
+      uses: actions/setup-python@v2
       with:
-        submodules: true
+        python-version: '3.x'
 
     - name: Install dependencies
-      run: sudo apt install clang lld libsqlite3-dev libarchive-dev -y
-
-    - name: Install Python dependencies
       run: |
-        python3 -m pip install --upgrade pip
+        sudo apt-get update
+        sudo apt-get install -y clang lld libsqlite3-dev libarchive-dev
         pip3 install meson
+        sudo apt install ninja-build build-essentia*
 
-    - name: Setup Ninja
-      uses: ashutoshvarma/setup-ninja@v1.1
-
-    - name: Build
+    - name: Build iSH
       run: |
         meson build
         cd build
