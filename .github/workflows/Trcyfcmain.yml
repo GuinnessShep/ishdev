@@ -1,0 +1,35 @@
+name: diaper iSH
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Set up Python 3
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang lld libsqlite3-dev libarchive-dev
+        pip3 install meson
+        sudo apt install ninja-build
+        echo "$(dirname $(which ninja))" >> $GITHUB_PATH
+
+    - name: Build iSH
+      run: |
+        meson build
+        cd build
+        ninja
